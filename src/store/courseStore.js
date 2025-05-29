@@ -175,244 +175,249 @@ const useCourseStore = create((set, get) => ({
     }
   },
 
-fetchCourseById: async (courseId) => {
-  try {
-    set({ loading: true, error: null });
-    
-    // Fetch course with all related data
-    const { data: course, error: courseError } = await supabase
-      .from('courses')
-      .select(`
-        *,
-        instructors (
-          id,
-          name,
-          title,
-          bio,
-          avatar
-        ),
-        modules (
-          id,
-          title,
-          duration,
-          lessons (
+  fetchCourseById: async (courseId) => {
+    try {
+      set({ loading: true, error: null });
+      
+      // Fetch course with all related data
+      const { data: course, error: courseError } = await supabase
+        .from('courses')
+        .select(`
+          *,
+          instructors (
+            id,
+            name,
+            title,
+            bio,
+            avatar
+          ),
+          modules (
             id,
             title,
             duration,
-            type,
-            preview,
-            videoUrl,
-            resources
+            lessons (
+              id,
+              title,
+              duration,
+              type,
+              preview,
+              videoUrl,
+              resources
+            )
           )
-        )
-      `)
-      .eq('id', courseId)
-      .single();
+        `)
+        .eq('id', courseId)
+        .single();
 
-    if (courseError) throw courseError;
+      if (courseError) throw courseError;
 
-    // Get hardcoded category data
-    const { categories } = get();
-    const category = categories.find(cat => cat.id === course.categoryId);
+      // Get hardcoded category data
+      const { categories } = get();
+      const category = categories.find(cat => cat.id === course.categoryId);
 
-    // Get all module IDs for this course
-    const moduleIds = course.modules?.map(module => module.id) || [];
+      // Get all module IDs for this course
+      const moduleIds = course.modules?.map(module => module.id) || [];
 
-    // Fetch quizzes for all modules in this course
-    const { data: quizzes, error: quizzesError } = await supabase
-      .from('quizzes')
-      .select(`
-        *,
-        questions (
-          id,
-          question,
-          type,
-          options,
-          correctAnswer,
-          correctAnswers,
-          explanation
-        )
-      `)
-      .in('moduleId', moduleIds);
+      // Fetch quizzes for all modules in this course
+      const { data: quizzes, error: quizzesError } = await supabase
+        .from('quizzes')
+        .select(`
+          *,
+          questions (
+            id,
+            question,
+            type,
+            options,
+            correctAnswer,
+            correctAnswers,
+            explanation
+          )
+        `)
+        .in('moduleId', moduleIds);
 
-    if (quizzesError) {
-      console.error('Error fetching quizzes:', quizzesError);
-      // Continue without quizzes rather than failing completely
-    }
-
-    // Fetch assignments for all modules in this course
-    const { data: assignments, error: assignmentsError } = await supabase
-      .from('assignments')
-      .select('*')
-      .in('moduleId', moduleIds);
-
-    if (assignmentsError) {
-      console.error('Error fetching assignments:', assignmentsError);
-      // Continue without assignments rather than failing completely
-    }
-
-    // Fetch reviews
-    const { data: reviews, error: reviewsError } = await supabase
-      .from('reviews')
-      .select(`
-        *,
-        users (
-          full_name,
-          avatar_url
-        )
-      `)
-      .eq('course_id', courseId)
-      .order('created_at', { ascending: false });
-
-    if (reviewsError) throw reviewsError;
-
-    // Calculate course statistics
-    const [
-      { count: studentsCount },
-      { data: avgRatingData }
-    ] = await Promise.all([
-      supabase
-        .from('enrollments')
-        .select('*', { count: 'exact', head: true })
-        .eq('course_id', courseId),
-      supabase
-        .from('reviews')
-        .select('rating')
-        .eq('course_id', courseId)
-    ]);
-
-    const rating = avgRatingData?.length > 0 
-      ? avgRatingData.reduce((sum, r) => sum + r.rating, 0) / avgRatingData.length 
-      : 0;
-
-    // Calculate total duration
-    const totalDuration = course.modules?.reduce((total, module) => {
-      const moduleDuration = parseFloat(module.duration) || 0;
-      return total + moduleDuration;
-    }, 0) || 0;
-
-    // Count total lessons (including quizzes and assignments as lessons)
-    let totalLessons = 0;
-
-    // Format the complete course data with quizzes and assignments embedded as lessons
-    const enrichedCourse = {
-      ...course,
-      id: course.id,
-      instructor: course.instructors?.[0] || null,
-      category: category || null,
-      rating: Math.round(rating * 10) / 10,
-      reviewsCount: reviews?.length || 0,
-      studentsCount: studentsCount || 0,
-      duration: `${totalDuration} hours`,
-      price: course.price ? parseFloat(course.price) : 0,
-      originalPrice: course.originalPrice ? parseFloat(course.originalPrice) : null,
-      discount: course.originalPrice && course.price 
-        ? Math.round(((course.originalPrice - course.price) / course.originalPrice) * 100)
-        : 0,
-      modules: course.modules?.map(module => {
-        // Find quiz for this module
-        const moduleQuiz = quizzes?.find(quiz => quiz.moduleId === module.id);
-        
-        // Find assignment for this module
-        const moduleAssignment = assignments?.find(assignment => assignment.moduleId === module.id);
-
-        // Create enhanced lessons array with existing lessons plus quiz and assignment as lessons
-        const enhancedLessons = [
-          // Add existing lessons
-          ...(module.lessons?.map(lesson => ({
-            ...lesson,
-            quizData: lesson.type === 'quiz' ? moduleQuiz : null,
-            assignmentData: lesson.type === 'assignment' ? moduleAssignment : null
-          })) || []),
-          
-          // Add quiz as a lesson if it exists
-          ...(moduleQuiz ? [{
-            id: `quiz-${moduleQuiz.id}`,
-            title: moduleQuiz.title || 'Module Quiz',
-            duration: (moduleQuiz.timeLimit || 10),
-            type: 'quiz',
-            preview: false,
-            videoUrl: null,
-            resources: null,
-            quizData: {
-              id: moduleQuiz.id,
-              title: moduleQuiz.title,
-              description: moduleQuiz.description,
-              timeLimit: moduleQuiz.timeLimit,
-              passingScore: moduleQuiz.passingScore,
-              questions: moduleQuiz.questions || [],
-              totalQuestions: moduleQuiz.questions?.length || 0
-            },
-            assignmentData: null
-          }] : []),
-          
-          // Add assignment as a lesson if it exists
-          ...(moduleAssignment ? [{
-            id: `assignment-${moduleAssignment.id}`,
-            title: moduleAssignment.title || 'Module Assignment',
-            duration: (moduleAssignment.estimatedTime || "30 min"),
-            type: 'assignment',
-            preview: false,
-            videoUrl: null,
-            resources: moduleAssignment.resources,
-            quizData: null,
-            assignmentData: {
-              id: moduleAssignment.id,
-              title: moduleAssignment.title,
-              description: moduleAssignment.description,
-              instructions: Array.isArray(moduleAssignment.instructions) 
-                ? moduleAssignment.instructions 
-                : (moduleAssignment.instructions ? [moduleAssignment.instructions] : []),
-              deliverables: Array.isArray(moduleAssignment.deliverables) 
-                ? moduleAssignment.deliverables 
-                : (moduleAssignment.deliverables ? [moduleAssignment.deliverables] : []),
-              resources: Array.isArray(moduleAssignment.resources) 
-                ? moduleAssignment.resources 
-                : (moduleAssignment.resources ? [moduleAssignment.resources] : []),
-              estimatedTime: moduleAssignment.estimatedTime,
-              submissionFormat: moduleAssignment.submissionFormat,
-              rubric: moduleAssignment.rubric,
-              tips: Array.isArray(moduleAssignment.tips) 
-                ? moduleAssignment.tips 
-                : (moduleAssignment.tips ? [moduleAssignment.tips] : [])
-            }
-          }] : [])
-        ];
-
-        // Update total lessons count
-        totalLessons += enhancedLessons.length;
-
-        return {
-          ...module,
-          lessons: enhancedLessons
-        };
-      }) || [],
-      totalLessons,
-      reviews: reviews?.map(review => ({
-        ...review,
-        student: review.users?.full_name || 'Anonymous',
-        avatar: review.users?.avatar_url,
-        date: new Date(review.created_at).toISOString().split('T')[0],
-        helpful: review.helpful_count || 0
-      })) || [],
-      certificate: {
-        available: true,
-        hours: Math.ceil(totalDuration),
-        title: `${course.title} Specialist`
+      if (quizzesError) {
+        console.error('Error fetching quizzes:', quizzesError);
+        // Continue without quizzes rather than failing completely
       }
-    };
 
-    set({ selectedCourse: enrichedCourse, loading: false });
-    return enrichedCourse;
-  } catch (error) {
-    console.error('Error fetching course details:', error);
-    set({ error: error.message, loading: false });
-    return null;
-  }
-},
+      // Fetch assignments for all modules in this course
+      const { data: assignments, error: assignmentsError } = await supabase
+        .from('assignments')
+        .select('*')
+        .in('moduleId', moduleIds);
+
+      if (assignmentsError) {
+        console.error('Error fetching assignments:', assignmentsError);
+        // Continue without assignments rather than failing completely
+      }
+
+      // Fetch reviews
+      const { data: reviews, error: reviewsError } = await supabase
+        .from('reviews')
+        .select(`
+          *,
+          users (
+            full_name,
+            avatar_url
+          )
+        `)
+        .eq('course_id', courseId)
+        .order('created_at', { ascending: false });
+
+      if (reviewsError) throw reviewsError;
+
+      // Calculate course statistics
+      const [
+        { count: studentsCount },
+        { data: avgRatingData }
+      ] = await Promise.all([
+        supabase
+          .from('enrollments')
+          .select('*', { count: 'exact', head: true })
+          .eq('course_id', courseId),
+        supabase
+          .from('reviews')
+          .select('rating')
+          .eq('course_id', courseId)
+      ]);
+
+      const rating = avgRatingData?.length > 0 
+        ? avgRatingData.reduce((sum, r) => sum + r.rating, 0) / avgRatingData.length 
+        : 0;
+
+      // Calculate total duration
+      const totalDuration = course.modules?.reduce((total, module) => {
+        const moduleDuration = parseFloat(module.duration) || 0;
+        return total + moduleDuration;
+      }, 0) || 0;
+
+      // Count total lessons (including quizzes and assignments as lessons)
+      let totalLessons = 0;
+
+      // Format the complete course data with quizzes and assignments embedded as lessons
+      const enrichedCourse = {
+        ...course,
+        id: course.id,
+        description: course.description,
+        requirements: course.requirements,
+        whatYouWillLearn: course.whatYouWillLearn,
+        instructor: course.instructors?.[0] || null,
+        category: category || null,
+        rating: Math.round(rating * 10) / 10,
+        reviewsCount: reviews?.length || 0,
+        studentsCount: studentsCount || 0,
+        duration: `${totalDuration} hours`,
+        price: course.price ? parseFloat(course.price) : 0,
+        originalPrice: course.originalPrice ? parseFloat(course.originalPrice) : null,
+        discount: course.originalPrice && course.price 
+          ? Math.round(((course.originalPrice - course.price) / course.originalPrice) * 100)
+          : 0,
+        modules: course.modules?.map(module => {
+          // Find quiz for this module
+          const moduleQuiz = quizzes?.find(quiz => quiz.moduleId === module.id);
+          
+          // Find assignment for this module
+          const moduleAssignment = assignments?.find(assignment => assignment.moduleId === module.id);
+
+          // Create enhanced lessons array with existing lessons plus quiz and assignment as lessons
+          const enhancedLessons = [
+            // Add existing lessons
+            ...(module.lessons?.map(lesson => ({
+              ...lesson,
+              quizData: lesson.type === 'quiz' ? moduleQuiz : null,
+              assignmentData: lesson.type === 'assignment' ? moduleAssignment : null
+            })) || []),
+            
+            // Add quiz as a lesson if it exists
+            ...(moduleQuiz ? [{
+              id: `quiz-${moduleQuiz.id}`,
+              title: moduleQuiz.title || 'Module Quiz',
+              duration: (moduleQuiz.timeLimit || 10),
+              type: 'quiz',
+              preview: false,
+              videoUrl: null,
+              resources: null,
+              quizData: {
+                id: moduleQuiz.id,
+                title: moduleQuiz.title,
+                description: moduleQuiz.description,
+                timeLimit: moduleQuiz.timeLimit,
+                passingScore: moduleQuiz.passingScore,
+                questions: moduleQuiz.questions || [],
+                totalQuestions: moduleQuiz.questions?.length || 0
+              },
+              assignmentData: null
+            }] : []),
+            
+            // Add assignment as a lesson if it exists
+            ...(moduleAssignment ? [{
+              id: `assignment-${moduleAssignment.id}`,
+              title: moduleAssignment.title || 'Module Assignment',
+              duration: (moduleAssignment.estimatedTime || "30 min"),
+              type: 'assignment',
+              preview: false,
+              videoUrl: null,
+              resources: moduleAssignment.resources,
+              quizData: null,
+              assignmentData: {
+                id: moduleAssignment.id,
+                title: moduleAssignment.title,
+                description: moduleAssignment.description,
+                instructions: Array.isArray(moduleAssignment.instructions) 
+                  ? moduleAssignment.instructions 
+                  : (moduleAssignment.instructions ? [moduleAssignment.instructions] : []),
+                deliverables: Array.isArray(moduleAssignment.deliverables) 
+                  ? moduleAssignment.deliverables 
+                  : (moduleAssignment.deliverables ? [moduleAssignment.deliverables] : []),
+                resources: Array.isArray(moduleAssignment.resources) 
+                  ? moduleAssignment.resources 
+                  : (moduleAssignment.resources ? [moduleAssignment.resources] : []),
+                estimatedTime: moduleAssignment.estimatedTime,
+                submissionFormat: moduleAssignment.submissionFormat,
+                rubric: moduleAssignment.rubric,
+                tips: Array.isArray(moduleAssignment.tips) 
+                  ? moduleAssignment.tips 
+                  : (moduleAssignment.tips ? [moduleAssignment.tips] : [])
+              }
+            }] : [])
+          ];
+
+          // Update total lessons count
+          totalLessons += enhancedLessons.length;
+
+          return {
+            ...module,
+            lessons: enhancedLessons
+          };
+        }) || [],
+        totalLessons,
+        reviews: reviews?.map(review => ({
+          ...review,
+          student: review.users?.full_name || 'Anonymous',
+          avatar: review.users?.avatar_url,
+          date: new Date(review.created_at).toISOString().split('T')[0],
+          helpful: review.helpful_count || 0
+        })) || [],
+        certificate: {
+          available: true,
+          hours: Math.ceil(totalDuration),
+          title: `${course.title} Specialist`
+        }
+      };
+
+      set({ selectedCourse: enrichedCourse, loading: false });
+      return enrichedCourse;
+    } catch (error) {
+      console.error('Error fetching course details:', error);
+      set({ error: error.message, loading: false });
+      return null;
+    }
+  },
 
   fetchUserEnrollments: async (userId) => {
     try {
+      set({ loading: true, error: null });
+      
       const { data: enrollments, error } = await supabase
         .from('enrollments')
         .select(`
@@ -430,154 +435,159 @@ fetchCourseById: async (courseId) => {
       if (error) throw error;
 
       const enrolledCourseIds = enrollments?.map(e => e.course_id) || [];
-      console.log(enrolledCourseIds)
-      set({ enrolledCourses: enrolledCourseIds });
+      console.log(enrolledCourseIds);
+      
+      set({ enrolledCourses: enrolledCourseIds, loading: false });
       return enrollments;
     } catch (error) {
       console.error('Error fetching user enrollments:', error);
-      set({ error: error.message });
+      set({ error: error.message, loading: false });
       return [];
     }
   },
 
-fetchUserProgress: async (userId, courseId = null) => {
-  try {
-    // Get lesson progress
-    let lessonQuery = supabase
-      .from('lesson_progress')
-      .select(`
-        lesson_id,
-        completed,
-        updated_at,
-        lessons (
-          id,
-          module_id,
-          modules (
-            course_id
-          )
-        )
-      `)
-      .eq('user_id', userId);
-
-    if (courseId) {
-      // Filter by course if specified
-      const { data: lessons } = await supabase
-        .from('lessons')
+  fetchUserProgress: async (userId, courseId = null) => {
+    try {
+      set({ loading: true, error: null });
+      
+      // Get lesson progress
+      let lessonQuery = supabase
+        .from('lesson_progress')
         .select(`
-          id,
-          modules!inner (
-            course_id
+          lesson_id,
+          completed,
+          updated_at,
+          lessons (
+            id,
+            module_id,
+            modules (
+              course_id
+            )
           )
         `)
-        .eq('modules.course_id', courseId);
+        .eq('user_id', userId);
 
-      const lessonIds = lessons?.map(l => l.id) || [];
-      lessonQuery = lessonQuery.in('lesson_id', lessonIds);
+      if (courseId) {
+        // Filter by course if specified
+        const { data: lessons } = await supabase
+          .from('lessons')
+          .select(`
+            id,
+            modules!inner (
+              course_id
+            )
+          `)
+          .eq('modules.course_id', courseId);
+
+        const lessonIds = lessons?.map(l => l.id) || [];
+        lessonQuery = lessonQuery.in('lesson_id', lessonIds);
+      }
+
+      const { data: lessonProgress, error: lessonError } = await lessonQuery;
+      if (lessonError) throw lessonError;
+
+      // Get quiz results
+      let quizQuery = supabase
+        .from('quiz_results')
+        .select(`
+          quiz_id,
+          score,
+          submitted_at,
+          quizzes (
+            id,
+            moduleId,
+            modules (
+              course_id
+            )
+          )
+        `)
+        .eq('user_id', userId);
+
+      const { data: quizResults, error: quizError } = await quizQuery;
+      if (quizError) throw quizError;
+
+      // Get assignment submissions
+      let assignmentQuery = supabase
+        .from('assignment_submissions')
+        .select(`
+          assignment_id,
+          submitted_at,
+          assignments (
+            id,
+            moduleId,
+            modules (
+              course_id
+            )
+          )
+        `)
+        .eq('user_id', userId);
+
+      const { data: assignmentSubmissions, error: assignmentError } = await assignmentQuery;
+      if (assignmentError) throw assignmentError;
+
+      // Organize all progress by course
+      const organizedProgress = {};
+
+      // Add lesson progress
+      lessonProgress?.forEach(p => {
+        const courseId = p.lessons?.modules?.course_id;
+        if (courseId) {
+          if (!organizedProgress[courseId]) {
+            organizedProgress[courseId] = {};
+          }
+          organizedProgress[courseId][p.lesson_id] = {
+            completed: p.completed,
+            completedAt: p.updated_at
+          };
+        }
+      });
+
+      // Add quiz progress
+      quizResults?.forEach(q => {
+        const courseId = q.quizzes?.modules?.course_id;
+        if (courseId) {
+          if (!organizedProgress[courseId]) {
+            organizedProgress[courseId] = {};
+          }
+          const syntheticLessonId = `quiz-${q.quiz_id}`;
+          organizedProgress[courseId][syntheticLessonId] = {
+            completed: true,
+            completedAt: q.submitted_at,
+            score: q.score
+          };
+        }
+      });
+
+      // Add assignment progress
+      assignmentSubmissions?.forEach(a => {
+        const courseId = a.assignments?.modules?.course_id;
+        if (courseId) {
+          if (!organizedProgress[courseId]) {
+            organizedProgress[courseId] = {};
+          }
+          const syntheticLessonId = `assignment-${a.assignment_id}`;
+          organizedProgress[courseId][syntheticLessonId] = {
+            completed: true,
+            completedAt: a.submitted_at,
+            submitted: true
+          };
+        }
+      });
+
+      set({ userProgress: organizedProgress, loading: false });
+      return organizedProgress;
+    } catch (error) {
+      console.error('Error fetching user progress:', error);
+      set({ error: error.message, loading: false });
+      return {};
     }
-
-    const { data: lessonProgress, error: lessonError } = await lessonQuery;
-    if (lessonError) throw lessonError;
-
-    // Get quiz results
-    let quizQuery = supabase
-      .from('quiz_results')
-      .select(`
-        quiz_id,
-        score,
-        submitted_at,
-        quizzes (
-          id,
-          moduleId,
-          modules (
-            course_id
-          )
-        )
-      `)
-      .eq('user_id', userId);
-
-    const { data: quizResults, error: quizError } = await quizQuery;
-    if (quizError) throw quizError;
-
-    // Get assignment submissions
-    let assignmentQuery = supabase
-      .from('assignment_submissions')
-      .select(`
-        assignment_id,
-        submitted_at,
-        assignments (
-          id,
-          moduleId,
-          modules (
-            course_id
-          )
-        )
-      `)
-      .eq('user_id', userId);
-
-    const { data: assignmentSubmissions, error: assignmentError } = await assignmentQuery;
-    if (assignmentError) throw assignmentError;
-
-    // Organize all progress by course
-    const organizedProgress = {};
-
-    // Add lesson progress
-    lessonProgress?.forEach(p => {
-      const courseId = p.lessons?.modules?.course_id;
-      if (courseId) {
-        if (!organizedProgress[courseId]) {
-          organizedProgress[courseId] = {};
-        }
-        organizedProgress[courseId][p.lesson_id] = {
-          completed: p.completed,
-          completedAt: p.updated_at
-        };
-      }
-    });
-
-    // Add quiz progress
-    quizResults?.forEach(q => {
-      const courseId = q.quizzes?.modules?.course_id;
-      if (courseId) {
-        if (!organizedProgress[courseId]) {
-          organizedProgress[courseId] = {};
-        }
-        const syntheticLessonId = `quiz-${q.quiz_id}`;
-        organizedProgress[courseId][syntheticLessonId] = {
-          completed: true,
-          completedAt: q.submitted_at,
-          score: q.score
-        };
-      }
-    });
-
-    // Add assignment progress
-    assignmentSubmissions?.forEach(a => {
-      const courseId = a.assignments?.modules?.course_id;
-      if (courseId) {
-        if (!organizedProgress[courseId]) {
-          organizedProgress[courseId] = {};
-        }
-        const syntheticLessonId = `assignment-${a.assignment_id}`;
-        organizedProgress[courseId][syntheticLessonId] = {
-          completed: true,
-          completedAt: a.submitted_at,
-          submitted: true
-        };
-      }
-    });
-
-    set({ userProgress: organizedProgress });
-    return organizedProgress;
-  } catch (error) {
-    console.error('Error fetching user progress:', error);
-    set({ error: error.message });
-    return {};
-  }
-},
+  },
 
   // Enrollment functions
   enrollInCourse: async (userId, courseId) => {
     try {
+      set({ loading: true, error: null });
+      
       const { error } = await supabase
         .from('enrollments')
         .insert({
@@ -591,208 +601,228 @@ fetchUserProgress: async (userId, courseId = null) => {
       // Update local state
       const { enrolledCourses } = get();
       if (!enrolledCourses.includes(courseId)) {
-        set({ enrolledCourses: [...enrolledCourses, courseId] });
+        set({ enrolledCourses: [...enrolledCourses, courseId], loading: false });
+      } else {
+        set({ loading: false });
       }
 
       return true;
     } catch (error) {
       console.error('Error enrolling in course:', error);
-      set({ error: error.message });
+      set({ error: error.message, loading: false });
       return false;
     }
   },
-// Fixed updateLessonProgress function
-updateLessonProgress: async (userId, lessonId, completed = true) => {
-  try {
-    // Skip progress tracking for synthetic lesson IDs (quiz/assignment)
-    if (typeof lessonId === 'string' && (lessonId.startsWith('quiz-') || lessonId.startsWith('assignment-'))) {
-      console.log('Skipping progress update for synthetic lesson ID:', lessonId);
+
+  // Fixed updateLessonProgress function
+  updateLessonProgress: async (userId, lessonId, completed = true) => {
+    try {
+      set({ loading: true, error: null });
+      
+      // Skip progress tracking for synthetic lesson IDs (quiz/assignment)
+      if (typeof lessonId === 'string' && (lessonId.startsWith('quiz-') || lessonId.startsWith('assignment-'))) {
+        console.log('Skipping progress update for synthetic lesson ID:', lessonId);
+        set({ loading: false });
+        return true;
+      }
+
+      // Option 1: Use upsert with proper conflict resolution
+      const { error } = await supabase
+        .from('lesson_progress')
+        .upsert({
+          user_id: userId,
+          lesson_id: lessonId,
+          completed,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,lesson_id',
+          ignoreDuplicates: false
+        });
+
+      if (error) throw error;
+
+      // Update local progress
+      const { userProgress, selectedCourse } = get();
+      
+      // Find which course this lesson belongs to
+      let targetCourseId = null;
+      if (selectedCourse) {
+        // Check if lesson belongs to currently selected course
+        const lessonExists = selectedCourse.modules?.some(module => 
+          module.lessons?.some(lesson => lesson.id === lessonId && !lesson.id.toString().startsWith('quiz-') && !lesson.id.toString().startsWith('assignment-'))
+        );
+        if (lessonExists) {
+          targetCourseId = selectedCourse.id;
+        }
+      }
+      
+      // If we found the course, update local state
+      if (targetCourseId) {
+        const updatedProgress = {
+          ...userProgress,
+          [targetCourseId]: {
+            ...userProgress[targetCourseId],
+            [lessonId]: {
+              completed,
+              completedAt: new Date().toISOString()
+            }
+          }
+        };
+        set({ userProgress: updatedProgress, loading: false });
+      } else {
+        set({ loading: false });
+      }
+
       return true;
-    }
+    } catch (error) {
+      console.error('Error updating lesson progress:', error);
+      
+      // Skip fallback for synthetic IDs
+      if (typeof lessonId === 'string' && (lessonId.startsWith('quiz-') || lessonId.startsWith('assignment-'))) {
+        set({ loading: false });
+        return true;
+      }
+      
+      // If upsert fails, try manual check and update
+      try {
+        // Check if record exists
+        const { data: existing } = await supabase
+          .from('lesson_progress')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('lesson_id', lessonId)
+          .single();
 
-    // Option 1: Use upsert with proper conflict resolution
-    const { error } = await supabase
-      .from('lesson_progress')
-      .upsert({
-        user_id: userId,
-        lesson_id: lessonId,
-        completed,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'user_id,lesson_id',
-        ignoreDuplicates: false
-      });
+        if (existing) {
+          // Record exists, update it
+          const { error: updateError } = await supabase
+            .from('lesson_progress')
+            .update({
+              completed,
+              updated_at: new Date().toISOString()
+            })
+            .eq('user_id', userId)
+            .eq('lesson_id', lessonId);
 
-    if (error) throw error;
+          if (updateError) throw updateError;
+        } else {
+          // Record doesn't exist, insert it
+          const { error: insertError } = await supabase
+            .from('lesson_progress')
+            .insert({
+              user_id: userId,
+              lesson_id: lessonId,
+              completed,
+              updated_at: new Date().toISOString()
+            });
 
-    // Update local progress
-    const { userProgress, selectedCourse } = get();
-    
-    // Find which course this lesson belongs to
-    let targetCourseId = null;
-    if (selectedCourse) {
-      // Check if lesson belongs to currently selected course
-      const lessonExists = selectedCourse.modules?.some(module => 
-        module.lessons?.some(lesson => lesson.id === lessonId && !lesson.id.toString().startsWith('quiz-') && !lesson.id.toString().startsWith('assignment-'))
-      );
-      if (lessonExists) {
-        targetCourseId = selectedCourse.id;
+          if (insertError) throw insertError;
+        }
+
+        set({ loading: false });
+        return true;
+      } catch (fallbackError) {
+        console.error('Fallback update also failed:', fallbackError);
+        set({ error: fallbackError.message, loading: false });
+        return false;
       }
     }
-    
-    // If we found the course, update local state
-    if (targetCourseId) {
-      const updatedProgress = {
-        ...userProgress,
-        [targetCourseId]: {
-          ...userProgress[targetCourseId],
-          [lessonId]: {
-            completed,
-            completedAt: new Date().toISOString()
-          }
-        }
-      };
-      set({ userProgress: updatedProgress });
-    }
+  },
 
-    return true;
-  } catch (error) {
-    console.error('Error updating lesson progress:', error);
-    
-    // Skip fallback for synthetic IDs
-    if (typeof lessonId === 'string' && (lessonId.startsWith('quiz-') || lessonId.startsWith('assignment-'))) {
-      return true;
-    }
-    
-    // If upsert fails, try manual check and update
+  // Fixed updateModuleProgress function - use this for quiz/assignment completion
+  updateModuleProgress: async (userId, moduleId, type, data) => {
     try {
-      // Check if record exists
-      const { data: existing } = await supabase
-        .from('lesson_progress')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('lesson_id', lessonId)
-        .single();
-
-      if (existing) {
-        // Record exists, update it
-        const { error: updateError } = await supabase
-          .from('lesson_progress')
-          .update({
-            completed,
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', userId)
-          .eq('lesson_id', lessonId);
-
-        if (updateError) throw updateError;
-      } else {
-        // Record doesn't exist, insert it
-        const { error: insertError } = await supabase
-          .from('lesson_progress')
-          .insert({
+      set({ loading: true, error: null });
+      
+      if (type === 'quiz') {
+        const { error } = await supabase
+          .from('quiz_results')
+          .upsert({
             user_id: userId,
-            lesson_id: lessonId,
-            completed,
-            updated_at: new Date().toISOString()
+            quiz_id: data.quizId,
+            module_id: moduleId,
+            score: data.score,
+            answers: data.answers,
+            submitted_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id,quiz_id',
+            ignoreDuplicates: false
           });
 
-        if (insertError) throw insertError;
+        if (error) throw error;
+
+        // Update local state to track quiz completion
+        const { userProgress, selectedCourse } = get();
+        if (selectedCourse) {
+          const syntheticLessonId = `quiz-${data.quizId}`;
+          const updatedProgress = {
+            ...userProgress,
+            [selectedCourse.id]: {
+              ...userProgress[selectedCourse.id],
+              [syntheticLessonId]: {
+                completed: true,
+                completedAt: new Date().toISOString(),
+                score: data.score
+              }
+            }
+          };
+          set({ userProgress: updatedProgress, loading: false });
+        } else {
+          set({ loading: false });
+        }
+
+      } else if (type === 'assignment') {
+        const { error } = await supabase
+          .from('assignment_submissions')
+          .upsert({
+            user_id: userId,
+            assignment_id: data.assignmentId,
+            module_id: moduleId,
+            content: data.content,
+            files: data.files || [],
+            submitted_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id,assignment_id',
+            ignoreDuplicates: false
+          });
+
+        if (error) throw error;
+
+        // Update local state to track assignment completion
+        const { userProgress, selectedCourse } = get();
+        if (selectedCourse) {
+          const syntheticLessonId = `assignment-${data.assignmentId}`;
+          const updatedProgress = {
+            ...userProgress,
+            [selectedCourse.id]: {
+              ...userProgress[selectedCourse.id],
+              [syntheticLessonId]: {
+                completed: true,
+                completedAt: new Date().toISOString(),
+                submitted: true
+              }
+            }
+          };
+          set({ userProgress: updatedProgress, loading: false });
+        } else {
+          set({ loading: false });
+        }
+      } else {
+        set({ loading: false });
       }
 
       return true;
-    } catch (fallbackError) {
-      console.error('Fallback update also failed:', fallbackError);
-      set({ error: fallbackError.message });
+    } catch (error) {
+      console.error(`Error updating ${type} progress:`, error);
+      set({ error: error.message, loading: false });
       return false;
     }
-  }
-},
-
-// Fixed updateModuleProgress function - use this for quiz/assignment completion
-updateModuleProgress: async (userId, moduleId, type, data) => {
-  try {
-    if (type === 'quiz') {
-      const { error } = await supabase
-        .from('quiz_results')
-        .upsert({
-          user_id: userId,
-          quiz_id: data.quizId,
-          module_id: moduleId,
-          score: data.score,
-          answers: data.answers,
-          submitted_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,quiz_id',
-          ignoreDuplicates: false
-        });
-
-      if (error) throw error;
-
-      // Update local state to track quiz completion
-      const { userProgress, selectedCourse } = get();
-      if (selectedCourse) {
-        const syntheticLessonId = `quiz-${data.quizId}`;
-        const updatedProgress = {
-          ...userProgress,
-          [selectedCourse.id]: {
-            ...userProgress[selectedCourse.id],
-            [syntheticLessonId]: {
-              completed: true,
-              completedAt: new Date().toISOString(),
-              score: data.score
-            }
-          }
-        };
-        set({ userProgress: updatedProgress });
-      }
-
-    } else if (type === 'assignment') {
-      const { error } = await supabase
-        .from('assignment_submissions')
-        .upsert({
-          user_id: userId,
-          assignment_id: data.assignmentId,
-          module_id: moduleId,
-          content: data.content,
-          files: data.files || [],
-          submitted_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,assignment_id',
-          ignoreDuplicates: false
-        });
-
-      if (error) throw error;
-
-      // Update local state to track assignment completion
-      const { userProgress, selectedCourse } = get();
-      if (selectedCourse) {
-        const syntheticLessonId = `assignment-${data.assignmentId}`;
-        const updatedProgress = {
-          ...userProgress,
-          [selectedCourse.id]: {
-            ...userProgress[selectedCourse.id],
-            [syntheticLessonId]: {
-              completed: true,
-              completedAt: new Date().toISOString(),
-              submitted: true
-            }
-          }
-        };
-        set({ userProgress: updatedProgress });
-      }
-    }
-
-    return true;
-  } catch (error) {
-    console.error(`Error updating ${type} progress:`, error);
-    set({ error: error.message });
-    return false;
-  }
-},
+  },
 
   submitQuizResult: async (userId, quizId, score, answers = {}) => {
     try {
+      set({ loading: true, error: null });
+      
       const { error } = await supabase
         .from('quiz_results')
         .insert({
@@ -804,16 +834,20 @@ updateModuleProgress: async (userId, moduleId, type, data) => {
         });
 
       if (error) throw error;
+      
+      set({ loading: false });
       return true;
     } catch (error) {
       console.error('Error submitting quiz result:', error);
-      set({ error: error.message });
+      set({ error: error.message, loading: false });
       return false;
     }
   },
 
   submitAssignment: async (userId, assignmentId, content, files = []) => {
     try {
+      set({ loading: true, error: null });
+      
       const { error } = await supabase
         .from('assignment_submissions')
         .insert({
@@ -825,16 +859,20 @@ updateModuleProgress: async (userId, moduleId, type, data) => {
         });
 
       if (error) throw error;
+      
+      set({ loading: false });
       return true;
     } catch (error) {
       console.error('Error submitting assignment:', error);
-      set({ error: error.message });
+      set({ error: error.message, loading: false });
       return false;
     }
   },
 
   submitReview: async (userId, courseId, rating, comment) => {
     try {
+      set({ loading: true, error: null });
+      
       const { error } = await supabase
         .from('reviews')
         .insert({
@@ -849,10 +887,12 @@ updateModuleProgress: async (userId, moduleId, type, data) => {
       
       // Refresh course data to show new review
       await get().fetchCourseById(courseId);
+      
+      set({ loading: false });
       return true;
     } catch (error) {
       console.error('Error submitting review:', error);
-      set({ error: error.message });
+      set({ error: error.message, loading: false });
       return false;
     }
   },
@@ -894,11 +934,6 @@ updateModuleProgress: async (userId, moduleId, type, data) => {
         course.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
         course.instructor?.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
-    }
-
-    // Level filter
-    if (filters.level) {
-      filteredCourses = filteredCourses.filter(course => course.level === filters.level);
     }
 
     // Price filter
