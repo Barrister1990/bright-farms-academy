@@ -4,8 +4,17 @@ import {
   UserCheck,
   Users
 } from 'lucide-react';
+import { useEffect } from 'react';
 import DashboardLayout from '../components/layout/DashboardLayout';
+import useAdminCourseStore from '../store/adminCourseStore';
+
 const AdminDashboard = () => {
+  const {getDashboardStats,initialize} = useAdminCourseStore()
+
+    useEffect(() => {
+      initialize();
+    }, []);
+  const dashboardStats = getDashboardStats();
   return (
     <DashboardLayout currentPage="Dashboard">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -17,7 +26,7 @@ const AdminDashboard = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Courses</p>
-              <p className="text-2xl font-semibold text-gray-900">124</p>
+              <p className="text-2xl font-semibold text-gray-900">{dashboardStats.courses.total}</p>
             </div>
           </div>
         </div>
@@ -29,7 +38,7 @@ const AdminDashboard = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Students</p>
-              <p className="text-2xl font-semibold text-gray-900">2,547</p>
+              <p className="text-2xl font-semibold text-gray-900">{dashboardStats.students.total}</p>
             </div>
           </div>
         </div>
@@ -41,7 +50,7 @@ const AdminDashboard = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Active Instructors</p>
-              <p className="text-2xl font-semibold text-gray-900">45</p>
+              <p className="text-2xl font-semibold text-gray-900">{dashboardStats.instructors.total}</p>
             </div>
           </div>
         </div>
@@ -53,7 +62,7 @@ const AdminDashboard = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Monthly Revenue</p>
-              <p className="text-2xl font-semibold text-gray-900">$24,580</p>
+              <p className="text-2xl font-semibold text-gray-900">{dashboardStats.revenue.total}</p>
             </div>
           </div>
         </div>

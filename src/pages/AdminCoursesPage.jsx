@@ -305,7 +305,7 @@ const AdminCoursesPage = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs sm:text-sm font-medium text-gray-600">Total Courses</p>
-                  <p className="text-lg sm:text-2xl font-bold text-gray-900">{dashboardStats.totalCourses}</p>
+                  <p className="text-lg sm:text-2xl font-bold text-gray-900">{dashboardStats.courses.total}</p>
                 </div>
                 <div className="w-8 h-8 sm:w-12 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                   <Filter className="text-blue-600" size={16} />
@@ -313,24 +313,14 @@ const AdminCoursesPage = () => {
               </div>
             </div>
 
-            <div className="bg-white p-3 sm:p-6 rounded-lg shadow-sm border">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-600">Published</p>
-                  <p className="text-lg sm:text-2xl font-bold text-green-600">{dashboardStats.publishedCourses}</p>
-                </div>
-                <div className="w-8 h-8 sm:w-12 sm:h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <Eye className="text-green-600" size={16} />
-                </div>
-              </div>
-            </div>
+           
 
             <div className="bg-white p-3 sm:p-6 rounded-lg shadow-sm border">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs sm:text-sm font-medium text-gray-600">Total Students</p>
                   <p className="text-lg sm:text-2xl font-bold text-purple-600">
-                    {dashboardStats.totalStudents?.toLocaleString()}
+                    {dashboardStats.students.total || 0}
                   </p>
                 </div>
                 <div className="w-8 h-8 sm:w-12 sm:h-12 bg-purple-100 rounded-lg flex items-center justify-center">

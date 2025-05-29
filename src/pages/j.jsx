@@ -1,1645 +1,1862 @@
-import {
-    AlertCircle,
-    BookOpen,
-    CheckCircle,
-    ChevronLeft,
-    ChevronRight,
-    Clock,
-    DollarSign,
-    Eye,
-    FileText,
-    Link,
-    Plus,
-    Save,
-    Settings,
-    Trash2,
-    Upload,
-    Users,
-    Video
-} from 'lucide-react';
-import { useState } from 'react';
-import DashboardLayout from '../components/layout/DashboardLayout';
-import { supabase } from '../lib/supabase';
+import { useEffect, useRef, useState } from 'react';
+import useCourseStore from '../store/courseStore';
 
-const AdminAddCourse = () => {
-  const [activeTab, setActiveTab] = useState('basic');
-  const [currentStep, setCurrentStep] = useState(1);
-  const [quizzes, setQuizzes] = useState([]);
-const [assignments, setAssignments] = useState([]);
-    // Touch/swipe handling
+const CourseDetailPage = ({ courseSlug }) => {
+  const demoSlug = courseSlug || 'modern-crop-management-techniques';
+  const [activeTab, setActiveTab] = useState('overview');
+  const [showFullDescription, setShowFullDescription] = useState(false);
+  const [selectedModule, setSelectedModule] = useState(null);
+  const [showVideo, setShowVideo] = useState(false);
+  const [currentLesson, setCurrentLesson] = useState(null);
+  const [showCongrats, setShowCongrats] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [videoProgress, setVideoProgress] = useState({});
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [isVideoLoading, setIsVideoLoading] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const [videoError, setVideoError] = useState(false);
+  const [lessonNotes, setLessonNotes] = useState({});
+const [completedLessons, setCompletedLessons] = useState([]);
+  const videoRef = useRef(null);
+  const controlsTimeoutRef = useRef(null);
+  const [quizState, setQuizState] = useState({
+  isActive: false,
+  currentQuestion: 0,
+  answers: {},
+  timeRemaining: null,
+  isSubmitted: false,
+  score: null,
+  showResults: false
+});
 
-  // Course basic information
-  const [courseData, setCourseData] = useState({
-    title: '',
-    slug: '',
-    description: '',
-    shortDescription: '',
-    image: '',
-    categoryId: '',
-    subcategory: '',
-    level: 'Beginner',
-    language: 'English',
-    price: '',
-    originalPrice: '',
-    requirements: [''],
-    whatYouWillLearn: [''],
-    targetAudience: [''],
-    featured: false,
-    bestseller: false
-  });
-
-  // Instructor information
-  const [instructorData, setInstructorData] = useState({
-    name: '',
-    title: '',
-    bio: '',
-    avatar: ''
-  });
-
-  // Modules and lessons
-  const [modules, setModules] = useState([{
-
-    title: '',
-    duration: '',
-    lessons: [{
-
-      title: '',
-      duration: '',
-      type: 'video',
-      preview: false,
-      videoUrl: '',
-      videoFile: null,
-      resources: ['']
-    }]
-  }]);
-  // Quiz Management Functions
-const addQuiz = () => {
-  const newQuiz = {
-    title: '',
-    description: '',
-    moduleId: '',
-    timeLimit: 10,
-    passingScore: 70,
-    questions: []
-  };
-  setQuizzes([...quizzes, newQuiz]);
-};
-const updateQuiz = (quizIndex, field, value) => {
-  const updatedQuizzes = [...quizzes];
-  updatedQuizzes[quizIndex][field] = value;
-  setQuizzes(updatedQuizzes);
-};
-
-const addQuestion = (quizIndex) => {
-  const updatedQuizzes = [...quizzes];
-  const newQuestion = {
-    type: 'multiple-choice',
-    question: '',
-    options: ['', '', '', ''],
-    correctAnswer: 0,
-    correctAnswers: [], // for multiple-select
-    explanation: ''
-  };
-  updatedQuizzes[quizIndex].questions.push(newQuestion);
-  setQuizzes(updatedQuizzes);
-};
-
-const updateQuestion = (quizIndex, questionIndex, field, value) => {
-  const updatedQuizzes = [...quizzes];
-  updatedQuizzes[quizIndex].questions[questionIndex][field] = value;
-  setQuizzes(updatedQuizzes);
-};
-
-const updateQuestionOption = (quizIndex, questionIndex, optionIndex, value) => {
-  const updatedQuizzes = [...quizzes];
-  updatedQuizzes[quizIndex].questions[questionIndex].options[optionIndex] = value;
-  setQuizzes(updatedQuizzes);
-};
-
-const addQuestionOption = (quizIndex, questionIndex) => {
-  const updatedQuizzes = [...quizzes];
-  updatedQuizzes[quizIndex].questions[questionIndex].options.push('');
-  setQuizzes(updatedQuizzes);
-};
-
-const removeQuestionOption = (quizIndex, questionIndex, optionIndex) => {
-  const updatedQuizzes = [...quizzes];
-  updatedQuizzes[quizIndex].questions[questionIndex].options.splice(optionIndex, 1);
-  setQuizzes(updatedQuizzes);
-};
-
-// Assignment Management Functions
-const addAssignment = () => {
-  const newAssignment = {
-    title: '',
-    description: '',
-    estimatedTime: '',
-    moduleId: '',
-    instructions: [''],
-    deliverables: [''],
-    resources: [''],
-    rubric: {},
-    submissionFormat: '',
-    tips: ['']
-  };
-  setAssignments([...assignments, newAssignment]);
-};
-
-const updateAssignment = (assignmentIndex, field, value) => {
-  const updatedAssignments = [...assignments];
-  updatedAssignments[assignmentIndex][field] = value;
-  setAssignments(updatedAssignments);
-};
-
-const updateAssignmentArray = (assignmentIndex, field, index, value) => {
-  const updatedAssignments = [...assignments];
-  updatedAssignments[assignmentIndex][field][index] = value;
-  setAssignments(updatedAssignments);
-};
-
-const addAssignmentArrayItem = (assignmentIndex, field) => {
-  const updatedAssignments = [...assignments];
-  updatedAssignments[assignmentIndex][field].push('');
-  setAssignments(updatedAssignments);
-};
-
-const validateQuizAssignments = () => {
-  const unassignedQuizzes = quizzes.filter(quiz => !quiz.moduleId);
-  const unassignedAssignments = assignments.filter(assignment => !assignment.moduleId);
+const [assignmentState, setAssignmentState] = useState({
+  isActive: false,
+  submissions: {},
+  isSubmitted: false,
+  files: []
+});
+const getLessonProgress = (lessonId) => {
+  if (completedLessons.includes(lessonId)) {
+    return 100;
+  }
   
-  if (unassignedQuizzes.length > 0 || unassignedAssignments.length > 0) {
-    alert('Please assign all quizzes and assignments to modules before saving.');
-    return false;
+  // Check video progress
+  if (videoProgress[lessonId]) {
+    return Math.round(videoProgress[lessonId].progress || 0);
   }
-  return true;
-};
-
-const removeAssignmentArrayItem = (assignmentIndex, field, index) => {
-  const updatedAssignments = [...assignments];
-  updatedAssignments[assignmentIndex][field].splice(index, 1);
-  setAssignments(updatedAssignments);
-};
-
-  // Video upload preference
-  const [videoUploadType, setVideoUploadType] = useState('url'); // 'url' or 'upload'
-
-  const tabs = [
-    { id: 'basic', label: 'Basic Info', icon: BookOpen, steps: 3 },
-    { id: 'instructor', label: 'Instructor', icon: Users, steps: 2 },
-    { id: 'modules', label: 'Modules & Lessons', icon: Video, steps: 4 },
-    { id: 'quizzes', label: 'Quizzes & Tests', icon: FileText, steps: 2 },
-    { id: 'settings', label: 'Settings', icon: Settings, steps: 2 }
-  ];
-
-  const currentTabData = tabs.find(tab => tab.id === activeTab);
-  const totalSteps = currentTabData?.steps || 1;
-
-  const handleInputChange = (field, value) => {
-    setCourseData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleArrayInputChange = (field, index, value) => {
-    setCourseData(prev => ({
-      ...prev,
-      [field]: prev[field].map((item, i) => i === index ? value : item)
-    }));
-  };
-
-  const addArrayItem = (field) => {
-    setCourseData(prev => ({
-      ...prev,
-      [field]: [...prev[field], '']
-    }));
-  };
-
-  const removeArrayItem = (field, index) => {
-    setCourseData(prev => ({
-      ...prev,
-      [field]: prev[field].filter((_, i) => i !== index)
-    }));
-  };
-
-  const addModule = () => {
-    const newModule = {
-      id: modules.length + 1,
-      title: '',
-      duration: '',
-      lessons: [{
-        id: 1,
-        title: '',
-        duration: '',
-        type: 'video',
-        preview: false,
-        videoUrl: '',
-        videoFile: null,
-        resources: ['']
-      }]
-    };
-    setModules([...modules, newModule]);
-  };
-
-  const addLesson = (moduleIndex) => {
-    const updatedModules = [...modules];
-    const newLesson = {
-      id: updatedModules[moduleIndex].lessons.length + 1,
-      title: '',
-      duration: '',
-      type: 'video',
-      preview: false,
-      videoUrl: '',
-      videoFile: null,
-      resources: ['']
-    };
-    updatedModules[moduleIndex].lessons.push(newLesson);
-    setModules(updatedModules);
-  };
-
-  const updateModule = (moduleIndex, field, value) => {
-    const updatedModules = [...modules];
-    updatedModules[moduleIndex][field] = value;
-    setModules(updatedModules);
-  };
-
-  const updateLesson = (moduleIndex, lessonIndex, field, value) => {
-    const updatedModules = [...modules];
-    updatedModules[moduleIndex].lessons[lessonIndex][field] = value;
-    setModules(updatedModules);
-  };
-
-  const handleVideoUpload = (moduleIndex, lessonIndex, file) => {
-    const updatedModules = [...modules];
-    updatedModules[moduleIndex].lessons[lessonIndex].videoFile = file;
-    updatedModules[moduleIndex].lessons[lessonIndex].videoUrl = URL.createObjectURL(file);
-    setModules(updatedModules);
-  };
-
-  const renderBasicInfoStep = () => {
-    switch (currentStep) {
-      case 1:
-        return (
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Course Details</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Course Title *
-                </label>
-                <input
-                  type="text"
-                  value={courseData.title}
-                  onChange={(e) => handleInputChange('title', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter course title"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Course Slug *
-                </label>
-                <input
-                  type="text"
-                  value={courseData.slug}
-                  onChange={(e) => handleInputChange('slug', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="course-slug-url"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Short Description *
-              </label>
-              <input
-                type="text"
-                value={courseData.shortDescription}
-                onChange={(e) => handleInputChange('shortDescription', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Brief course description"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Full Description *
-              </label>
-              <textarea
-                value={courseData.description}
-                onChange={(e) => handleInputChange('description', e.target.value)}
-                rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Detailed course description"
-              />
-            </div>
-          </div>
-        );
-      
-      case 2:
-        return (
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Course Classification</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Category *
-                </label>
-                <select
-                  value={courseData.categoryId}
-                  onChange={(e) => handleInputChange('categoryId', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Select Category</option>
-                  <option value="1">Agriculture</option>
-                  <option value="2">Technology</option>
-                  <option value="3">Business</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Subcategory *
-                </label>
-                <input
-                  type="text"
-                  value={courseData.subcategory}
-                  onChange={(e) => handleInputChange('subcategory', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., Vegetable Farming"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Level *
-                </label>
-                <select
-                  value={courseData.level}
-                  onChange={(e) => handleInputChange('level', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="Beginner">Beginner</option>
-                  <option value="Intermediate">Intermediate</option>
-                  <option value="Advanced">Advanced</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Language *
-                </label>
-                <select
-                  value={courseData.language}
-                  onChange={(e) => handleInputChange('language', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="English">English</option>
-                  <option value="Spanish">Spanish</option>
-                  <option value="French">French</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Course Image URL
-                </label>
-                <input
-                  type="url"
-                  value={courseData.image}
-                  onChange={(e) => handleInputChange('image', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="https://example.com/image.jpg"
-                />
-              </div>
-            </div>
-          </div>
-        );
-      
-      case 3:
-        return (
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Pricing & Features</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Current Price *
-                </label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                  <input
-                    type="number"
-                    value={courseData.price}
-                    onChange={(e) => handleInputChange('price', e.target.value)}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="89"
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Original Price
-                </label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                  <input
-                    type="number"
-                    value={courseData.originalPrice}
-                    onChange={(e) => handleInputChange('originalPrice', e.target.value)}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="149"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex space-x-6">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={courseData.featured}
-                  onChange={(e) => handleInputChange('featured', e.target.checked)}
-                  className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <span className="text-sm text-gray-700">Featured Course</span>
-              </label>
-              
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={courseData.bestseller}
-                  onChange={(e) => handleInputChange('bestseller', e.target.checked)}
-                  className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <span className="text-sm text-gray-700">Bestseller</span>
-              </label>
-            </div>
-          </div>
-        );
-      
-      default:
-        return null;
-    }
-  };
-
-  const renderInstructorStep = () => {
-    switch (currentStep) {
-      case 1:
-        return (
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Instructor Information</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Instructor Name *
-                </label>
-                <input
-                  type="text"
-                  value={instructorData.name}
-                  onChange={(e) => setInstructorData(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Dr. Sarah Johnson"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Professional Title *
-                </label>
-                <input
-                  type="text"
-                  value={instructorData.title}
-                  onChange={(e) => setInstructorData(prev => ({ ...prev, title: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Agricultural Scientist & Extension Expert"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Avatar URL
-              </label>
-              <input
-                type="url"
-                value={instructorData.avatar}
-                onChange={(e) => setInstructorData(prev => ({ ...prev, avatar: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="https://example.com/avatar.jpg"
-              />
-            </div>
-          </div>
-        );
-      
-      case 2:
-        return (
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Instructor Bio</h3>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Biography *
-              </label>
-              <textarea
-                value={instructorData.bio}
-                onChange={(e) => setInstructorData(prev => ({ ...prev, bio: e.target.value }))}
-                rows={6}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Dr. Johnson has 15+ years of experience in crop science and has helped over 10,000 farmers increase their yields."
-              />
-            </div>
-          </div>
-        );
-      
-      default:
-        return null;
-    }
-  };
-
-  const renderModulesStep = () => {
-    switch (currentStep) {
-      case 1:
-        return (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-gray-900">Course Modules</h3>
-              <button
-                onClick={addModule}
-                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Module
-              </button>
-            </div>
-            
-            {modules.map((module, moduleIndex) => (
-              <div key={module.id} className="border border-gray-200 rounded-lg p-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Module Title *
-                    </label>
-                    <input
-                      type="text"
-                      value={module.title}
-                      onChange={(e) => updateModule(moduleIndex, 'title', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Introduction to Modern Crop Management"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Duration *
-                    </label>
-                    <input
-                      type="text"
-                      value={module.duration}
-                      onChange={(e) => updateModule(moduleIndex, 'duration', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="45 min"
-                    />
-                  </div>
-                </div>
-                
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="font-medium text-gray-800">Lessons</h4>
-                  <button
-                    onClick={() => addLesson(moduleIndex)}
-                    className="flex items-center px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Add Lesson
-                  </button>
-                </div>
-                
-                {module.lessons.map((lesson, lessonIndex) => (
-                  <div key={lesson.id} className="bg-gray-50 rounded-lg p-3 mb-2">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Lesson Title
-                        </label>
-                        <input
-                          type="text"
-                          value={lesson.title}
-                          onChange={(e) => updateLesson(moduleIndex, lessonIndex, 'title', e.target.value)}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                          placeholder="Course Overview"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Duration
-                        </label>
-                        <input
-                          type="text"
-                          value={lesson.duration}
-                          onChange={(e) => updateLesson(moduleIndex, lessonIndex, 'duration', e.target.value)}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                          placeholder="8 min"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Type
-                        </label>
-                        <select
-                          value={lesson.type}
-                          onChange={(e) => updateLesson(moduleIndex, lessonIndex, 'type', e.target.value)}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                        >
-                          <option value="video">Video</option>
-                          <option value="quiz">Quiz</option>
-                          <option value="assignment">Assignment</option>
-                          <option value="reading">Reading</option>
-                        </select>
-                      </div>
-                    </div>
-                    
-                    {lesson.type === 'video' && (
-                      <div className="space-y-3">
-                        <div className="flex space-x-4">
-                          <label className="flex items-center">
-                            <input
-                              type="radio"
-                              name={`video-type-${moduleIndex}-${lessonIndex}`}
-                              value="url"
-                              checked={videoUploadType === 'url'}
-                              onChange={(e) => setVideoUploadType(e.target.value)}
-                              className="mr-2"
-                            />
-                            <Link className="h-4 w-4 mr-1" />
-                            Video URL
-                          </label>
-                          <label className="flex items-center">
-                            <input
-                              type="radio"
-                              name={`video-type-${moduleIndex}-${lessonIndex}`}
-                              value="upload"
-                              checked={videoUploadType === 'upload'}
-                              onChange={(e) => setVideoUploadType(e.target.value)}
-                              className="mr-2"
-                            />
-                            <Upload className="h-4 w-4 mr-1" />
-                            Upload Video
-                          </label>
-                        </div>
-                        
-                        {videoUploadType === 'url' ? (
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                              Video URL
-                            </label>
-                            <input
-                              type="url"
-                              value={lesson.videoUrl}
-                              onChange={(e) => updateLesson(moduleIndex, lessonIndex, 'videoUrl', e.target.value)}
-                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                              placeholder="https://example.com/video.mp4"
-                            />
-                          </div>
-                        ) : (
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                              Upload Video File
-                            </label>
-                            <input
-                              type="file"
-                              accept="video/*"
-                              onChange={(e) => handleVideoUpload(moduleIndex, lessonIndex, e.target.files[0])}
-                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                            />
-                            {lesson.videoFile && (
-                              <p className="text-xs text-green-600 mt-1">
-                                File uploaded: {lesson.videoFile.name}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                        
-                        <label className="flex items-center text-sm">
-                          <input
-                            type="checkbox"
-                            checked={lesson.preview}
-                            onChange={(e) => updateLesson(moduleIndex, lessonIndex, 'preview', e.target.checked)}
-                            className="mr-2 h-3 w-3"
-                          />
-                          <Eye className="h-3 w-3 mr-1" />
-                          Free Preview
-                        </label>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        );
-      
-      default:
-        return (
-          <div className="text-center py-8">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Step {currentStep} Content
-            </h3>
-            <p className="text-gray-600">
-              Additional module configuration steps would go here.
-            </p>
-          </div>
-        );
-    }
-  };
-
-  const renderQuizzesStep = () => {
-  switch (currentStep) {
-    case 1:
-      return (
-        <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-gray-900">Course Quizzes</h3>
-            <button
-              onClick={addQuiz}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Quiz
-            </button>
-          </div>
-          
-          {quizzes.length === 0 ? (
-            <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
-              <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h4 className="text-lg font-medium text-gray-900 mb-2">No Quizzes Yet</h4>
-              <p className="text-gray-600 mb-4">Add your first quiz to test student knowledge</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {quizzes.map((quiz, quizIndex) => (
-  <div key={quiz.id} className="border border-gray-200 rounded-lg p-6">
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Quiz Title *
-        </label>
-        <input
-          type="text"
-          value={quiz.title}
-          onChange={(e) => updateQuiz(quizIndex, 'title', e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          placeholder="Knowledge Check: Agriculture Basics"
-        />
-      </div>
-      
-      {/* ADD THIS MODULE SELECTOR */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Associated Module *
-        </label>
-        <select
-          value={quiz.moduleId}
-          onChange={(e) => updateQuiz(quizIndex, 'moduleId', e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        >
-          <option value="">Select Module</option>
-          {modules.map((module) => (
-            <option key={module.id} value={module.id}>
-              {module.title || `Module ${module.id}`}
-            </option>
-          ))}
-        </select>
-      </div>
-                    
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Time Limit (min)
-                        </label>
-                        <input
-                          type="number"
-                          value={quiz.timeLimit}
-                          onChange={(e) => updateQuiz(quizIndex, 'timeLimit', parseInt(e.target.value))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="10"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Passing Score (%)
-                        </label>
-                        <input
-                          type="number"
-                          value={quiz.passingScore}
-                          onChange={(e) => updateQuiz(quizIndex, 'passingScore', parseInt(e.target.value))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="70"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Description
-                    </label>
-                    <textarea
-                      value={quiz.description}
-                      onChange={(e) => updateQuiz(quizIndex, 'description', e.target.value)}
-                      rows={2}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Test your understanding of fundamental agricultural concepts"
-                    />
-                  </div>
-
-                  <div className="flex justify-between items-center mb-3">
-                    <h4 className="font-medium text-gray-800">Questions ({quiz.questions.length})</h4>
-                    <button
-                      onClick={() => addQuestion(quizIndex)}
-                      className="flex items-center px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      Add Question
-                    </button>
-                  </div>
-
-                  {quiz.questions.map((question, questionIndex) => (
-                    <div key={question.id} className="bg-gray-50 rounded-lg p-4 mb-3">
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
-                        <div className="md:col-span-2">
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Question
-                          </label>
-                          <input
-                            type="text"
-                            value={question.question}
-                            onChange={(e) => updateQuestion(quizIndex, questionIndex, 'question', e.target.value)}
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                            placeholder="What is the primary goal of modern crop management?"
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Type
-                          </label>
-                          <select
-                            value={question.type}
-                            onChange={(e) => updateQuestion(quizIndex, questionIndex, 'type', e.target.value)}
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                          >
-                            <option value="multiple-choice">Multiple Choice</option>
-                            <option value="true-false">True/False</option>
-                            <option value="multiple-select">Multiple Select</option>
-                          </select>
-                        </div>
-
-                        {question.type === 'multiple-choice' && (
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                              Correct Answer
-                            </label>
-                            <select
-                              value={question.correctAnswer}
-                              onChange={(e) => updateQuestion(quizIndex, questionIndex, 'correctAnswer', parseInt(e.target.value))}
-                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                            >
-                              {question.options.map((_, optIndex) => (
-                                <option key={optIndex} value={optIndex}>Option {optIndex + 1}</option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-
-                        {question.type === 'true-false' && (
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                              Correct Answer
-                            </label>
-                            <select
-                              value={question.correctAnswer}
-                              onChange={(e) => updateQuestion(quizIndex, questionIndex, 'correctAnswer', parseInt(e.target.value))}
-                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                            >
-                              <option value={0}>True</option>
-                              <option value={1}>False</option>
-                            </select>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="mb-3">
-                        <div className="flex justify-between items-center mb-2">
-                          <label className="block text-xs font-medium text-gray-600">
-                            Options
-                          </label>
-                          {question.type !== 'true-false' && (
-                            <button
-                              onClick={() => addQuestionOption(quizIndex, questionIndex)}
-                              className="text-xs text-blue-600 hover:text-blue-700"
-                            >
-                              + Add Option
-                            </button>
-                          )}
-                        </div>
-                        
-                        {question.type === 'true-false' ? (
-                          <div className="grid grid-cols-2 gap-2">
-                            <input
-                              type="text"
-                              value="True"
-                              disabled
-                              className="px-2 py-1 text-sm border border-gray-300 rounded bg-gray-100"
-                            />
-                            <input
-                              type="text"
-                              value="False"
-                              disabled
-                              className="px-2 py-1 text-sm border border-gray-300 rounded bg-gray-100"
-                            />
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            {question.options.map((option, optionIndex) => (
-                              <div key={optionIndex} className="flex items-center space-x-2">
-                                {question.type === 'multiple-select' && (
-                                  <input
-                                    type="checkbox"
-                                    checked={question.correctAnswers?.includes(optionIndex) || false}
-                                    onChange={(e) => {
-                                      const correctAnswers = question.correctAnswers || [];
-                                      const newCorrectAnswers = e.target.checked
-                                        ? [...correctAnswers, optionIndex]
-                                        : correctAnswers.filter(idx => idx !== optionIndex);
-                                      updateQuestion(quizIndex, questionIndex, 'correctAnswers', newCorrectAnswers);
-                                    }}
-                                    className="h-3 w-3"
-                                  />
-                                )}
-                                <input
-                                  type="text"
-                                  value={option}
-                                  onChange={(e) => updateQuestionOption(quizIndex, questionIndex, optionIndex, e.target.value)}
-                                  className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                                  placeholder={`Option ${optionIndex + 1}`}
-                                />
-                                {question.options.length > 2 && question.type !== 'true-false' && (
-                                  <button
-                                    onClick={() => removeQuestionOption(quizIndex, questionIndex, optionIndex)}
-                                    className="p-1 text-red-600 hover:bg-red-50 rounded"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Explanation
-                        </label>
-                        <textarea
-                          value={question.explanation}
-                          onChange={(e) => updateQuestion(quizIndex, questionIndex, 'explanation', e.target.value)}
-                          rows={2}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                          placeholder="Explain why this is the correct answer..."
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      );
-
-    case 2:
-      return (
-        <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-gray-900">Course Assignments</h3>
-            <button
-              onClick={addAssignment}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Assignment
-            </button>
-          </div>
-          
-          {assignments.length === 0 ? (
-            <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
-              <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h4 className="text-lg font-medium text-gray-900 mb-2">No Assignments Yet</h4>
-              <p className="text-gray-600 mb-4">Add practical assignments for hands-on learning</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {assignments.map((assignment, assignmentIndex) => (
-                <div key={assignment.id} className="border border-gray-200 rounded-lg p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Assignment Title *
-                      </label>
-                      <input
-                        type="text"
-                        value={assignment.title}
-                        onChange={(e) => updateAssignment(assignmentIndex, 'title', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Create Your Soil Preparation Plan"
-                      />
-                    </div>
-                     <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Associated Module *
-        </label>
-        <select
-          value={assignment.moduleId}
-          onChange={(e) => updateAssignment(assignmentIndex, 'moduleId', e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        >
-          <option value="">Select Module</option>
-          {modules.map((module) => (
-            <option key={module.id} value={module.id}>
-              {module.title || `Module ${module.id}`}
-            </option>
-          ))}
-        </select>
-      </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Estimated Time
-                      </label>
-                      <input
-                        type="text"
-                        value={assignment.estimatedTime}
-                        onChange={(e) => updateAssignment(assignmentIndex, 'estimatedTime', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="15-20 minutes"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Description
-                    </label>
-                    <textarea
-                      value={assignment.description}
-                      onChange={(e) => updateAssignment(assignmentIndex, 'description', e.target.value)}
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Develop a comprehensive soil preparation plan for a specific crop of your choice."
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Instructions */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Instructions
-                      </label>
-                      {assignment.instructions.map((instruction, index) => (
-                        <div key={index} className="flex items-center space-x-2 mb-2">
-                          <input
-                            type="text"
-                            value={instruction}
-                            onChange={(e) => updateAssignmentArray(assignmentIndex, 'instructions', index, e.target.value)}
-                            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500"
-                            placeholder="Choose a crop you want to grow"
-                          />
-                          <button
-                            onClick={() => removeAssignmentArrayItem(assignmentIndex, 'instructions', index)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                      <button
-                        onClick={() => addAssignmentArrayItem(assignmentIndex, 'instructions')}
-                        className="flex items-center text-sm text-blue-600 hover:text-blue-700"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Instruction
-                      </button>
-                    </div>
-
-                    {/* Deliverables */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Deliverables
-                      </label>
-                      {assignment.deliverables.map((deliverable, index) => (
-                        <div key={index} className="flex items-center space-x-2 mb-2">
-                          <input
-                            type="text"
-                            value={deliverable}
-                            onChange={(e) => updateAssignmentArray(assignmentIndex, 'deliverables', index, e.target.value)}
-                            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500"
-                            placeholder="Completed soil preparation checklist"
-                          />
-                          <button
-                            onClick={() => removeAssignmentArrayItem(assignmentIndex, 'deliverables', index)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                      <button
-                        onClick={() => addAssignmentArrayItem(assignmentIndex, 'deliverables')}
-                        className="flex items-center text-sm text-blue-600 hover:text-blue-700"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Deliverable
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                    {/* Resources */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Resources
-                      </label>
-                      {assignment.resources.map((resource, index) => (
-                        <div key={index} className="flex items-center space-x-2 mb-2">
-                          <input
-                            type="text"
-                            value={resource}
-                            onChange={(e) => updateAssignmentArray(assignmentIndex, 'resources', index, e.target.value)}
-                            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500"
-                            placeholder="Soil preparation template (downloadable PDF)"
-                          />
-                          <button
-                            onClick={() => removeAssignmentArrayItem(assignmentIndex, 'resources', index)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                      <button
-                        onClick={() => addAssignmentArrayItem(assignmentIndex, 'resources')}
-                        className="flex items-center text-sm text-blue-600 hover:text-blue-700"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Resource
-                      </button>
-                    </div>
-
-                    {/* Tips */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Tips
-                      </label>
-                      {assignment.tips.map((tip, index) => (
-                        <div key={index} className="flex items-center space-x-2 mb-2">
-                          <input
-                            type="text"
-                            value={tip}
-                            onChange={(e) => updateAssignmentArray(assignmentIndex, 'tips', index, e.target.value)}
-                            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500"
-                            placeholder="Consider your local climate and growing season"
-                          />
-                          <button
-                            onClick={() => removeAssignmentArrayItem(assignmentIndex, 'tips', index)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                      <button
-                        onClick={() => addAssignmentArrayItem(assignmentIndex, 'tips')}
-                        className="flex items-center text-sm text-blue-600 hover:text-blue-700"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Tip
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Submission Format
-                    </label>
-                    <input
-                      type="text"
-                      value={assignment.submissionFormat}
-                      onChange={(e) => updateAssignment(assignmentIndex, 'submissionFormat', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Upload completed worksheets as PDF or submit online form"
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      );
-
-    default:
-      return null;
+  
+  // Check quiz progress
+  if (quizState.isActive && currentLesson?.id === lessonId) {
+    return Math.round((quizState.currentQuestion / (currentLesson.quizData?.questions?.length || 1)) * 100);
   }
+
+  // Check assignment progress
+  if (assignmentState.isActive && currentLesson?.id === lessonId) {
+    const totalDeliverables = currentLesson.assignmentData?.deliverables?.length || 1;
+    const completedDeliverables = Object.values(assignmentState.submissions).filter(sub => sub?.trim()).length;
+    return Math.round((completedDeliverables / totalDeliverables) * 100);
+  }
+  
+  return 0;
 };
 
-  const renderCurrentTabContent = () => {
-    switch (activeTab) {
-      case 'basic':
-        return renderBasicInfoStep();
-      case 'instructor':
-        return renderInstructorStep();
-      case 'modules':
-        return renderModulesStep();
-      case 'quizzes':
-  return renderQuizzesStep();
-      case 'settings':
-        return (
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Course Requirements & Outcomes</h3>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Requirements
-              </label>
-              {courseData.requirements.map((req, index) => (
-                <div key={index} className="flex items-center space-x-2 mb-2">
-                  <input
-                    type="text"
-                    value={req}
-                    onChange={(e) => handleArrayInputChange('requirements', index, e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Basic understanding of farming principles"
-                  />
-                  <button
-                    onClick={() => removeArrayItem('requirements', index)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-              <button
-                onClick={() => addArrayItem('requirements')}
-                className="flex items-center text-sm text-blue-600 hover:text-blue-700"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add Requirement
-              </button>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                What You Will Learn
-              </label>
-              {courseData.whatYouWillLearn.map((item, index) => (
-                <div key={index} className="flex items-center space-x-2 mb-2">
-                  <input
-                    type="text"
-                    value={item}
-                    onChange={(e) => handleArrayInputChange('whatYouWillLearn', index, e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Advanced crop rotation strategies"
-                  />
-                  <button
-                    onClick={() => removeArrayItem('whatYouWillLearn', index)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-              <button
-                onClick={() => addArrayItem('whatYouWillLearn')}
-                className="flex items-center text-sm text-blue-600 hover:text-blue-700"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add Learning Outcome
-              </button>
-            </div>
-          </div>
-        );
-      default:
-        return null;
+const markLessonComplete = (lessonId) => {
+  setCompletedLessons(prev => {
+    if (!prev.includes(lessonId)) {
+      return [...prev, lessonId];
     }
-  };
-
-  const nextStep = () => {
-    if (currentStep < totalSteps) {
-      setCurrentStep(currentStep + 1);
-    }
-  };
-
-  const prevStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const handleTabChange = (tabId) => {
-    setActiveTab(tabId);
-    setCurrentStep(1);
-  };
-
-  const uploadFileToStorage = async (file, path) => {
-  const { data, error } = await supabase.storage.from('course-content').upload(path, file, {
-    cacheControl: '3600',
-    upsert: true
+    return prev;
   });
-  if (error) throw error;
-  const { data: urlData } = supabase.storage.from('course-content').getPublicUrl(path);
-  return urlData.publicUrl;
 };
 
-const saveCourseToSupabase = async () => {
-  try {
-    // 1. Upload Course Image
-    let imageUrl = courseData.image;
-    if (courseData.image instanceof File) {
-      const imagePath = `images/${Date.now()}_${courseData.image.name}`;
-      imageUrl = await uploadFileToStorage(courseData.image, imagePath);
+const isAssignmentComplete = () => {
+  if (!currentLesson?.assignmentData?.deliverables) {
+    return assignmentState.submissions['Assignment Response']?.trim();
+  }
+  
+  return currentLesson.assignmentData.deliverables.every(deliverable => 
+    assignmentState.submissions[deliverable]?.trim()
+  );
+};
+const handleAssignmentSubmit = () => {
+  if (!isAssignmentComplete()) {
+    alert('Please complete all deliverables before submitting');
+    return;
+  }
+  
+  setAssignmentState(prev => ({
+    ...prev,
+    isSubmitted: true
+  }));
+  
+  // Here you would typically send the assignment data to your backend
+  console.log('Assignment submitted:', {
+    lessonId: currentLesson.id,
+    submissions: assignmentState.submissions,
+    files: assignmentState.files
+  });
+};
+
+useEffect(() => {
+  let timer;
+  if (quizState.isActive && quizState.timeRemaining > 0 && !quizState.isSubmitted) {
+    timer = setInterval(() => {
+      setQuizState(prev => ({
+        ...prev,
+        timeRemaining: prev.timeRemaining - 1
+      }));
+    }, 1000);
+  } else if (quizState.timeRemaining === 0 && !quizState.isSubmitted) {
+    handleQuizSubmit();
+  }
+  return () => clearInterval(timer);
+}, [quizState.isActive, quizState.timeRemaining, quizState.isSubmitted]);
+
+// Quiz Functions
+const startQuiz = (lesson) => {
+  const quizData = lesson.quizData;
+  setQuizState({
+    isActive: true,
+    currentQuestion: 0,
+    answers: {},
+    timeRemaining: quizData.timeLimit * 60, // convert minutes to seconds
+    isSubmitted: false,
+    score: null,
+    showResults: false
+  });
+  setCurrentLesson(lesson);
+};
+
+const handleQuizAnswer = (questionId, answer) => {
+  setQuizState(prev => ({
+    ...prev,
+    answers: {
+      ...prev.answers,
+      [questionId]: answer
     }
+  }));
+};
 
-    // 2. Upload Instructor Avatar
-    let avatarUrl = instructorData.avatar;
-    if (instructorData.avatar instanceof File) {
-      const avatarPath = `avatars/${Date.now()}_${instructorData.avatar.name}`;
-      avatarUrl = await uploadFileToStorage(instructorData.avatar, avatarPath);
-    }
-
-    // 3. Insert Course
-    const { data: courseInsert, error: courseError } = await supabase
-      .from('courses')
-      .insert({
-        ...courseData,
-        image: imageUrl
-      })
-      .select()
-      .single();
-    if (courseError) throw courseError;
-
-    const courseId = courseInsert.id;
-
-    // 4. Insert Instructor
-    const { error: instructorError } = await supabase.from('instructors').insert({
-      ...instructorData,
-      avatar: avatarUrl,
-      course_id: courseId
-    });
-    if (instructorError) throw instructorError;
-
-    // 5. Insert Modules, Lessons, and Upload Lesson Videos
-    for (const module of modules) {
-      const { data: moduleInsert, error: moduleError } = await supabase
-        .from('modules')
-        .insert({
-          title: module.title,
-          duration: module.duration,
-          course_id: courseId
-        })
-        .select()
-        .single();
-      if (moduleError) throw moduleError;
-
-      const moduleId = moduleInsert.id;
-
-      for (const lesson of module.lessons) {
-        let lessonVideoUrl = lesson.videoUrl;
-
-        if (lesson.videoFile instanceof File) {
-          const videoPath = `videos/${Date.now()}_${lesson.videoFile.name}`;
-          lessonVideoUrl = await uploadFileToStorage(lesson.videoFile, videoPath);
-        }
-
-        const { error: lessonError } = await supabase.from('lessons').insert({
-          title: lesson.title,
-          duration: lesson.duration,
-          type: lesson.type,
-          preview: lesson.preview,
-          video_url: lessonVideoUrl,
-          module_id: moduleId
-        });
-
-        if (lessonError) throw lessonError;
+const handleQuizSubmit = () => {
+  const lesson = currentLesson;
+  const quizData = lesson.quizData;
+  let correctCount = 0;
+  
+  quizData.questions.forEach(question => {
+    const userAnswer = quizState.answers[question.id];
+    
+    if (question.type === 'multiple-select') {
+      const correctAnswers = question.correctAnswers;
+      const userAnswers = userAnswer || [];
+      
+      if (correctAnswers.length === userAnswers.length && 
+          correctAnswers.every(ans => userAnswers.includes(ans))) {
+        correctCount++;
+      }
+    } else {
+      if (userAnswer === question.correctAnswer) {
+        correctCount++;
       }
     }
-
-    // 6. Insert Quizzes
-    for (const quiz of quizzes) {
-      const { data: quizInsert, error: quizError } = await supabase
-        .from('quizzes')
-        .insert({
-          title: quiz.title,
-          description: quiz.description,
-          time_limit: quiz.timeLimit,
-          passing_score: quiz.passingScore,
-          course_id: courseId
-        })
-        .select()
-        .single();
-      if (quizError) throw quizError;
-
-      const quizId = quizInsert.id;
-
-      for (const question of quiz.questions) {
-        await supabase.from('quiz_questions').insert({
-          quiz_id: quizId,
-          question: question.question,
-          type: question.type,
-          options: question.options,
-          correct_answer: question.correctAnswer,
-          correct_answers: question.correctAnswers,
-          explanation: question.explanation
-        });
-      }
-    }
-
-    // 7. Insert Assignments
-    for (const assignment of assignments) {
-      const { error: assignmentError } = await supabase.from('assignments').insert({
-        ...assignment,
-        course_id: courseId
-      });
-      if (assignmentError) throw assignmentError;
-    }
-
-    alert('Course successfully saved!');
-  } catch (error) {
-    console.error('Error saving course:', error.message);
-    alert('An error occurred while saving the course.');
+  });
+  
+  const score = Math.round((correctCount / quizData.questions.length) * 100);
+  const passed = score >= quizData.passingScore;
+  
+  setQuizState(prev => ({
+    ...prev,
+    isSubmitted: true,
+    score: score,
+    showResults: true
+  }));
+  
+  // Update progress if passed
+  if (passed) {
+    updateCourseProgress(course.id, lesson.id, true);
+    handleLessonComplete(lesson.id);
   }
 };
 
+const nextQuestion = () => {
+  setQuizState(prev => ({
+    ...prev,
+    currentQuestion: Math.min(prev.currentQuestion + 1, currentLesson.quizData.questions.length - 1)
+  }));
+};
 
+const previousQuestion = () => {
+  setQuizState(prev => ({
+    ...prev,
+    currentQuestion: Math.max(prev.currentQuestion - 1, 0)
+  }));
+};
+
+// Assignment Functions
+const startAssignment = (lesson) => {
+  setAssignmentState({
+    isActive: true,
+    submissions: {},
+    isSubmitted: false,
+    files: []
+  });
+  setCurrentLesson(lesson);
+};
+
+const handleAssignmentSubmission = (field, value) => {
+  setAssignmentState(prev => ({
+    ...prev,
+    submissions: {
+      ...prev.submissions,
+      [field]: value
+    }
+  }));
+};
+
+const handleFileUpload = (files) => {
+  setAssignmentState(prev => ({
+    ...prev,
+    files: [...prev.files, ...files]
+  }));
+};
+
+const submitAssignment = () => {
+  setAssignmentState(prev => ({
+    ...prev,
+    isSubmitted: true
+  }));
+  
+  // Mark lesson as completed
+  updateCourseProgress(course.id, currentLesson.id, true);
+  handleLessonComplete(currentLesson.id);
+  
+  alert('Assignment submitted successfully!');
+};
+
+
+
+  const {
+    courses,
+    getCoursesByCategory,
+    getCourseProgress,
+    getCourseCompletionPercentage,
+    updateCourseProgress,
+    enrollInCourse,
+    isEnrolledInCourse
+  } = useCourseStore();
+
+  const course = courses.find(c => c.slug === demoSlug || c.id.toString() === demoSlug);
+  const relatedCourses = course ? getCoursesByCategory(course.categoryId).filter(c => c.id !== course.id).slice(0, 4) : [];
+  const progress = course ? getCourseProgress(course.id) : {};
+  const completionPercentage = course ? getCourseCompletionPercentage(course.id) : 0;
+  const isEnrolled = course ? isEnrolledInCourse(course.id) : false;
+
+  const [cartItems, setCartItems] = useState([]);
+  const [wishlistItems, setWishlistItems] = useState([]);
+
+  useEffect(() => {
+    if (course) {
+      setSelectedModule(course.modules[0]?.id || null);
+    }
+  }, [course]);
+
+  // Auto-hide controls after 3 seconds of inactivity
+  useEffect(() => {
+    if (currentLesson && showControls) {
+      clearTimeout(controlsTimeoutRef.current);
+      controlsTimeoutRef.current = setTimeout(() => {
+        if (!videoRef.current?.paused) {
+          setShowControls(false);
+        }
+      }, 3000);
+    }
+    return () => clearTimeout(controlsTimeoutRef.current);
+  }, [currentLesson, showControls]);
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      if (!currentLesson || !videoRef.current) return;
+      
+      switch (e.key) {
+        case ' ':
+          e.preventDefault();
+          if (videoRef.current.paused) {
+            videoRef.current.play();
+          } else {
+            videoRef.current.pause();
+          }
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          videoRef.current.currentTime = Math.min(videoRef.current.duration, videoRef.current.currentTime + 10);
+          break;
+        case 'f':
+          e.preventDefault();
+          toggleFullscreen();
+          break;
+        case 'Escape':
+          if (isFullscreen) {
+            setIsFullscreen(false);
+          }
+          break;
+      }
+    };
+
+    if (currentLesson) {
+      document.addEventListener('keydown', handleKeyPress);
+      return () => document.removeEventListener('keydown', handleKeyPress);
+    }
+  }, [currentLesson, isFullscreen]);
+
+  if (!course) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="text-center max-w-sm mx-auto">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">Course Not Found</h2>
+          <p className="text-gray-600 mb-6 text-sm sm:text-base">The course you're looking for doesn't exist.</p>
+          <button 
+            onClick={() => window.history.back()}
+            className="bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition-colors w-full sm:w-auto"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const handleEnroll = () => {
+    enrollInCourse(course.id);
+    setShowCongrats(true);
+    setTimeout(() => setShowCongrats(false), 3000);
+  };
+
+  const handleAddToCart = () => {
+    if (!cartItems.includes(course.id)) {
+      setCartItems([...cartItems, course.id]);
+      alert('Course added to cart!');
+    }
+  };
+
+  const handleAddToWishlist = () => {
+    if (!wishlistItems.includes(course.id)) {
+      setWishlistItems([...wishlistItems, course.id]);
+      alert('Course added to wishlist!');
+    }
+  };
+
+  const handleLessonComplete = (lessonId) => {
+    updateCourseProgress(course.id, lessonId, true);
+    
+    // Show completion animation
+    const lessonElement = document.getElementById(`lesson-${lessonId}`);
+    if (lessonElement) {
+      lessonElement.classList.add('animate-pulse');
+      setTimeout(() => {
+        lessonElement.classList.remove('animate-pulse');
+      }, 1000);
+    }
+  };
+
+  const handleStartLesson = (lesson) => {
+    setCurrentLesson(lesson);
+    setVideoError(false);
+    setIsVideoLoading(true);
+    if (!progress[lesson.id]) {
+      updateCourseProgress(course.id, lesson.id, false);
+    }
+  };
+
+  const handleContinueLearning = () => {
+    // Find the next incomplete lesson
+    const allLessons = course.modules.flatMap(module => module.lessons);
+    const nextLesson = allLessons.find(lesson => !progress[lesson.id]?.completed);
+    
+    if (nextLesson) {
+      setCurrentLesson(nextLesson);
+      setActiveTab('curriculum');
+      const moduleWithLesson = course.modules.find(module => 
+        module.lessons.some(lesson => lesson.id === nextLesson.id)
+      );
+      if (moduleWithLesson) {
+        setSelectedModule(moduleWithLesson.id);
+      }
+    }
+  };
+
+  const getNextLesson = (currentLessonId) => {
+    const allLessons = course.modules.flatMap(module => module.lessons);
+    const currentIndex = allLessons.findIndex(lesson => lesson.id === currentLessonId);
+    return currentIndex < allLessons.length - 1 ? allLessons[currentIndex + 1] : null;
+  };
+
+  const getPreviousLesson = (currentLessonId) => {
+    const allLessons = course.modules.flatMap(module => module.lessons);
+    const currentIndex = allLessons.findIndex(lesson => lesson.id === currentLessonId);
+    return currentIndex > 0 ? allLessons[currentIndex - 1] : null;
+  };
+
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+  };
+
+  const formatTime = (seconds) => {
+    if (isNaN(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleVideoTimeUpdate = (e) => {
+    const currentTime = e.target.currentTime;
+    const duration = e.target.duration;
+    const progressPercent = (currentTime / duration) * 100;
+    
+    setVideoProgress(prev => ({
+      ...prev,
+      [currentLesson.id]: {
+        currentTime,
+        duration,
+        progress: progressPercent
+      }
+    }));
+
+    // Auto-mark as completed when 90% watched
+    if (progressPercent >= 90 && !progress[currentLesson.id]?.completed) {
+      handleLessonComplete(currentLesson.id);
+    }
+  };
+
+  const handleVideoLoadedMetadata = () => {
+    setIsVideoLoading(false);
+  };
+
+  const handleVideoError = () => {
+    setVideoError(true);
+    setIsVideoLoading(false);
+  };
+
+  const handleSeek = (e) => {
+    if (!videoRef.current) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pos = (e.clientX - rect.left) / rect.width;
+    videoRef.current.currentTime = pos * videoRef.current.duration;
+  };
+
+  const totalLessons = course.modules.reduce((total, module) => total + module.lessons.length, 0);
+
+  const completedLessonsCount = Object.values(progress).filter(lesson => lesson.completed).length;
+  const enrollmentDate = isEnrolled ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toLocaleDateString() : null;
 
   return (
-     <DashboardLayout currentPage="Courses">
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto py-6">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Add New Course</h1>
-<p className="text-sm sm:text-base text-gray-600 mt-2">
-  Create and manage your course content...
-</p>
+      {/* Congratulations Toast */}
+      {showCongrats && (
+        <div className="fixed top-4 right-4 bg-emerald-600 text-white px-6 py-4 rounded-lg shadow-lg z-50 animate-bounce">
+          <div className="flex items-center">
+            <span className="text-2xl mr-3">🎉</span>
+            <div>
+              <div className="font-semibold">Welcome to the course!</div>
+              <div className="text-sm opacity-90">Start learning now</div>
+            </div>
+          </div>
         </div>
+      )}
 
-        {/* Tab Navigation */}
-        <div className="bg-white rounded-lg shadow-sm mb-6">
-          <div className="border-b border-gray-200">
-            <nav className="flex overflow-x-auto no-scrollbar sm:space-x-3 space-x-4 px-4 sm:px-2">
-              {tabs.map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => handleTabChange(tab.id)}
-                    className={`flex items-center py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
-                      isActive
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
+{/* Course Preview Video Modal */}
+{showVideo && (
+  <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+    <div className="bg-white rounded-lg max-w-4xl w-full max-h-full overflow-auto">
+      <div className="flex justify-between items-center p-4 border-b">
+        <h3 className="text-lg font-semibold">Course Preview</h3>
+        <button 
+          onClick={() => setShowVideo(false)}
+          className="text-gray-500 hover:text-gray-700 text-xl"
+        >
+          ✕
+        </button>
+      </div>
+      <div className="p-4">
+        <video 
+          className="w-full aspect-video rounded bg-black"
+          controls
+          autoPlay
+          preload="metadata"
+          onError={(e) => console.error('Video error:', e)}
+        >
+          <source src="https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4" type="video/mp4" />
+          <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
+        <div className="mt-4 text-sm text-gray-600">
+          Course introduction and overview
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
+{/* Enhanced Lesson Player Modal - Udemy Style */}
+{currentLesson && (
+  <div className={`fixed inset-0 bg-black z-50 ${isFullscreen ? '' : 'p-0 sm:p-4'}`}>
+    <div className={`bg-black h-screen w-full ${isFullscreen ? '' : 'sm:bg-white sm:rounded-lg sm:overflow-hidden sm:max-w-7xl sm:mx-auto'}`}>
+      {/* Header - Hidden in fullscreen */}
+      {!isFullscreen && (
+        <div className="hidden sm:flex justify-between items-center p-4 border-b bg-white">
+          <div>
+            <h3 className="text-lg font-semibold">{currentLesson.title}</h3>
+            <p className="text-sm text-gray-600">{currentLesson.type} • {currentLesson.duration}</p>
+          </div>
+          <button 
+            onClick={() => setCurrentLesson(null)}
+            className="text-gray-500 hover:text-gray-700 text-2xl p-2"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      <div className={`${isFullscreen ? 'h-full' : 'h-full sm:h-auto'} flex flex-col sm:flex-row`}>
+        {/* Content Section - Changes based on lesson type */}
+        <div className={`${isFullscreen ? 'h-full' : 'h-64 sm:h-96 lg:h-[500px] sm:flex-1'} relative bg-black`}>
+          {currentLesson.type === 'video' ? (
+            <div className="relative h-full">
+              {/* Loading Spinner */}
+              {isVideoLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+                </div>
+              )}
+
+              {/* Video Error State */}
+              {videoError && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black text-white">
+                  <div className="text-center">
+                    <div className="text-4xl mb-4">⚠️</div>
+                    <div className="text-xl mb-2">Video unavailable</div>
+                    <div className="text-sm opacity-75">Please try again later</div>
+                    <button 
+                      onClick={() => {
+                        setVideoError(false);
+                        setIsVideoLoading(true);
+                        if (videoRef.current) {
+                          videoRef.current.load();
+                        }
+                      }}
+                      className="mt-4 px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Video Element */}
+              <video 
+                ref={videoRef}
+                className="w-full h-full object-contain"
+                preload="metadata"
+                onLoadedMetadata={handleVideoLoadedMetadata}
+                onTimeUpdate={handleVideoTimeUpdate}
+                onError={handleVideoError}
+                onPlay={() => setShowControls(true)}
+                onPause={() => setShowControls(true)}
+                onClick={() => setShowControls(!showControls)}
+                onMouseMove={() => setShowControls(true)}
+              >
+                {currentLesson.videoUrl && (
+                  <source src={currentLesson.videoUrl} type="video/mp4" />
+                )}
+                <source src="https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4" type="video/mp4" />
+                <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4" />
+              </video>
+
+              {/* Custom Video Controls */}
+              <div className={`absolute inset-0 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
+                {/* Close button for mobile */}
+                <button 
+                  onClick={() => setCurrentLesson(null)}
+                  className="absolute top-4 right-4 z-20 text-white bg-black bg-opacity-50 w-10 h-10 rounded-full flex items-center justify-center sm:hidden"
+                >
+                  ✕
+                </button>
+
+                {/* Play/Pause Button */}
+                <button
+                  onClick={() => {
+                    if (videoRef.current.paused) {
+                      videoRef.current.play();
+                    } else {
+                      videoRef.current.pause();
+                    }
+                  }}
+                  className="absolute inset-0 flex items-center justify-center text-white text-6xl hover:bg-black hover:bg-opacity-20 transition-colors"
+                >
+                  {videoRef.current?.paused !== false ? '▶️' : '⏸️'}
+                </button>
+
+                {/* Bottom Controls */}
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4">
+                  {/* Progress Bar */}
+                  <div 
+                    className="w-full h-2 bg-white bg-opacity-30 rounded-full mb-4 cursor-pointer"
+                    onClick={handleSeek}
                   >
-                    <Icon className="h-5 w-5 mr-2" />
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
+                    <div 
+                      className="h-full bg-red-600 rounded-full transition-all"
+                      style={{ 
+                        width: `${videoProgress[currentLesson.id]?.progress || 0}%` 
+                      }}
+                    />
+                  </div>
 
-          {/* Progress Bar */}
-          <div className="px-6 py-4 bg-gray-50">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">
-                Step {currentStep} of {totalSteps}
-              </span>
-              <span className="text-sm text-gray-500">
-                {Math.round((currentStep / totalSteps) * 100)}% Complete
-              </span>
+                  {/* Control Buttons */}
+                  <div className="flex items-center justify-between text-white">
+                    <div className="flex items-center space-x-4">
+                      {/* Play/Pause */}
+                      <button
+                        onClick={() => {
+                          if (videoRef.current.paused) {
+                            videoRef.current.play();
+                          } else {
+                            videoRef.current.pause();
+                          }
+                        }}
+                        className="text-2xl hover:scale-110 transition-transform"
+                      >
+                        {videoRef.current?.paused !== false ? '▶️' : '⏸️'}
+                      </button>
+
+                      {/* Skip back */}
+                      <button
+                        onClick={() => {
+                          if (videoRef.current) {
+                            videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
+                          }
+                        }}
+                        className="text-xl hover:scale-110 transition-transform"
+                      >
+                        ⏪
+                      </button>
+
+                      {/* Skip forward */}
+                      <button
+                        onClick={() => {
+                          if (videoRef.current) {
+                            videoRef.current.currentTime = Math.min(videoRef.current.duration, videoRef.current.currentTime + 10);
+                          }
+                        }}
+                        className="text-xl hover:scale-110 transition-transform"
+                      >
+                        ⏩
+                      </button>
+
+                      {/* Time Display */}
+                      <span className="text-sm">
+                        {formatTime(videoProgress[currentLesson.id]?.currentTime || 0)} / {formatTime(videoProgress[currentLesson.id]?.duration || 0)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center space-x-4">
+                      {/* Playback Speed */}
+                      <select 
+                        value={playbackRate}
+                        onChange={(e) => {
+                          const rate = parseFloat(e.target.value);
+                          setPlaybackRate(rate);
+                          if (videoRef.current) {
+                            videoRef.current.playbackRate = rate;
+                          }
+                        }}
+                        className="bg-black bg-opacity-50 text-white text-sm border border-white border-opacity-30 rounded px-2 py-1"
+                      >
+                        <option value="0.5">0.5x</option>
+                        <option value="0.75">0.75x</option>
+                        <option value="1">1x</option>
+                        <option value="1.25">1.25x</option>
+                        <option value="1.5">1.5x</option>
+                        <option value="2">2x</option>
+                      </select>
+
+                      {/* Fullscreen Toggle */}
+                      <button
+                        onClick={toggleFullscreen}
+                        className="text-xl hover:scale-110 transition-transform"
+                      >
+                        {isFullscreen ? '🗗' : '⛶'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${(currentStep / totalSteps) * 100}%` }}
-              ></div>
+          ) : currentLesson.type === 'quiz' ? (
+  <div className="h-screen bg-white flex flex-col overflow-auto">
+    {!quizState.isActive ? (
+      // Quiz Start Screen
+      <div className="flex-1 overflow-y-auto">
+        <div className="min-h-full flex items-center justify-center p-4 sm:p-6 lg:p-8">
+          <div className="text-center max-w-2xl w-full">
+            <div className="text-4xl sm:text-5xl lg:text-6xl mb-4 lg:mb-6">📝</div>
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-3 lg:mb-4 px-2">
+              {currentLesson.quizData?.title || currentLesson.title}
+            </h2>
+            <p className="text-gray-600 mb-6 lg:mb-6 text-sm sm:text-base lg:text-lg leading-relaxed px-2">
+              {currentLesson.quizData?.description || 'Test your knowledge with this quiz'}
+            </p>
+            
+            <div className="bg-blue-50 rounded-lg p-4 sm:p-6 mb-6 lg:mb-8 mx-2 sm:mx-0">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-center">
+                <div className="py-2">
+                  <div className="font-semibold text-blue-900 text-sm sm:text-base">Questions</div>
+                  <div className="text-xl sm:text-2xl font-bold text-blue-600">
+                    {currentLesson.quizData?.questions?.length || currentLesson.questions || 5}
+                  </div>
+                </div>
+                <div className="py-2">
+                  <div className="font-semibold text-blue-900 text-sm sm:text-base">Time Limit</div>
+                  <div className="text-xl sm:text-2xl font-bold text-blue-600">
+                    {currentLesson.quizData?.timeLimit || 15} min
+                  </div>
+                </div>
+                <div className="py-2">
+                  <div className="font-semibold text-blue-900 text-sm sm:text-base">Passing Score</div>
+                  <div className="text-xl sm:text-2xl font-bold text-blue-600">
+                    {currentLesson.quizData?.passingScore || 70}%
+                  </div>
+                </div>
+              </div>
             </div>
+            
+            <button 
+              onClick={() => startQuiz(currentLesson)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg transition-colors w-full sm:w-auto"
+            >
+              Start Quiz
+            </button>
           </div>
         </div>
-
-        {/* Main Content */}
-        <div className="bg-white rounded-lg shadow-sm">
-          <div className="p-6">
-            {renderCurrentTabContent()}
+      </div>
+    ) : !quizState.showResults ? (
+      // Quiz Active Screen
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Quiz Header */}
+        <div className="bg-blue-600 text-white p-3 sm:p-4 flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="min-w-0 flex-1 pr-4">
+              <h3 className="font-semibold text-sm sm:text-base truncate">
+                {currentLesson.quizData?.title || currentLesson.title}
+              </h3>
+              <div className="text-xs sm:text-sm opacity-90">
+                Question {quizState.currentQuestion + 1} of {currentLesson.quizData?.questions?.length || 1}
+              </div>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <div className="text-lg sm:text-2xl font-bold">
+                {formatTime(quizState.timeRemaining)}
+              </div>
+              <div className="text-xs sm:text-sm opacity-90">Time Left</div>
+            </div>
           </div>
-
-          {/* Navigation Buttons */}
-          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center px-4 sm:px-6 py-4 bg-gray-50 border-t border-gray-200 gap-3 sm:gap-0">
-
+          
+          {/* Progress Bar */}
+          <div className="w-full bg-blue-500 rounded-full h-2 mt-3 sm:mt-4">
+            <div 
+              className="bg-white h-2 rounded-full transition-all duration-300"
+              style={{ 
+                width: `${((quizState.currentQuestion + 1) / (currentLesson.quizData?.questions?.length || 1)) * 100}%` 
+              }}
+            />
+          </div>
+        </div>
+        
+        {/* Question Content */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-4 sm:p-6 lg:p-8">
+            {(() => {
+              const question = currentLesson.quizData?.questions?.[quizState.currentQuestion];
+              if (!question) {
+                return (
+                  <div className="text-center text-gray-600 py-8">
+                    Quiz content not available
+                  </div>
+                );
+              }
+              
+              return (
+                <div className="max-w-3xl mx-auto">
+                  <h4 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4 sm:mb-6 leading-relaxed">
+                    {question.question}
+                  </h4>
+                  
+                  <div className="space-y-3">
+                    {question.type === 'multiple-choice' || question.type === 'true-false' ? (
+                      question.options?.map((option, index) => (
+                        <label 
+                          key={index}
+                          className="flex items-start p-3 sm:p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                        >
+                          <input
+                            type="radio"
+                            name={`question-${question.id}`}
+                            value={index}
+                            checked={quizState.answers[question.id] === index}
+                            onChange={() => handleQuizAnswer(question.id, index)}
+                            className="mr-3 mt-1 text-blue-600 flex-shrink-0"
+                          />
+                          <span className="text-sm sm:text-base leading-relaxed">{option}</span>
+                        </label>
+                      ))
+                    ) : question.type === 'multiple-select' ? (
+                      question.options?.map((option, index) => (
+                        <label 
+                          key={index}
+                          className="flex items-start p-3 sm:p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            value={index}
+                            checked={(quizState.answers[question.id] || []).includes(index)}
+                            onChange={(e) => {
+                              const currentAnswers = quizState.answers[question.id] || [];
+                              const newAnswers = e.target.checked 
+                                ? [...currentAnswers, index]
+                                : currentAnswers.filter(ans => ans !== index);
+                              handleQuizAnswer(question.id, newAnswers);
+                            }}
+                            className="mr-3 mt-1 text-blue-600 flex-shrink-0"
+                          />
+                          <span className="text-sm sm:text-base leading-relaxed">{option}</span>
+                        </label>
+                      ))
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+        
+        {/* Navigation */}
+        <div className="border-t bg-gray-50 p-3 sm:p-4 flex-shrink-0">
+          <div className="flex justify-between items-center max-w-3xl mx-auto w-full">
             <button
-              onClick={prevStep}
-              disabled={currentStep === 1}
-              className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
-                currentStep === 1
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+              onClick={previousQuestion}
+              disabled={quizState.currentQuestion === 0}
+              className="px-4 sm:px-6 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors text-sm sm:text-base"
             >
-              <ChevronLeft className="h-4 w-4 mr-2" />
               Previous
             </button>
-
-            <div className="flex space-x-3">
-              <button
-                
-                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Save Draft
-              </button>
-
-              {currentStep < totalSteps ? (
+            
+            <div className="flex space-x-2 sm:space-x-3">
+              {quizState.currentQuestion === (currentLesson.quizData?.questions?.length || 1) - 1 ? (
                 <button
-                  onClick={nextStep}
-                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  onClick={handleQuizSubmit}
+                  className="px-4 sm:px-8 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold text-sm sm:text-base"
                 >
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-2" />
+                  Submit Quiz
                 </button>
               ) : (
                 <button
-                  onClick={saveCourseToSupabase}
-                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  onClick={nextQuestion}
+                  className="px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
                 >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Publish Course
+                  Next
                 </button>
               )}
             </div>
           </div>
         </div>
-
-        {/* Status Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mt-6">
-
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Clock className="h-6 w-6 text-blue-600" />
-              </div>
-              <div className="ml-4">
-                <h4 className="text-lg font-semibold text-gray-900">Draft Status</h4>
-                <p className="text-gray-600">Course in progress</p>
-              </div>
+      </div>
+    ) : (
+      // Quiz Results Screen
+      <div className="flex-1 overflow-y-auto">
+        <div className="min-h-full flex items-center justify-center p-4 sm:p-6 lg:p-8">
+          <div className="text-center max-w-2xl w-full">
+            <div className="text-4xl sm:text-5xl lg:text-6xl mb-4 lg:mb-6">
+              {quizState.score >= (currentLesson.quizData?.passingScore || 70) ? '🎉' : '😞'}
             </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <AlertCircle className="h-6 w-6 text-yellow-600" />
-              </div>
-              <div className="ml-4">
-                <h4 className="text-lg font-semibold text-gray-900">Validation</h4>
-                <p className="text-gray-600">Pending review</p>
-              </div>
+            
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-3 lg:mb-4 px-2">
+              Quiz {quizState.score >= (currentLesson.quizData?.passingScore || 70) ? 'Completed!' : 'Not Passed'}
+            </h2>
+            
+            <div className={`text-4xl sm:text-5xl lg:text-6xl font-bold mb-4 lg:mb-6 ${
+              quizState.score >= (currentLesson.quizData?.passingScore || 70) ? 'text-green-600' : 'text-red-600'
+            }`}>
+              {quizState.score}%
             </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <CheckCircle className="h-6 w-6 text-green-600" />
-              </div>
-              <div className="ml-4">
-                <h4 className="text-lg font-semibold text-gray-900">Auto-save</h4>
-                <p className="text-gray-600">Changes saved</p>
-              </div>
+            
+            <p className="text-gray-600 mb-6 lg:mb-8 text-sm sm:text-base leading-relaxed px-2">
+              {quizState.score >= (currentLesson.quizData?.passingScore || 70)
+                ? `Congratulations! You passed with ${quizState.score}% (required: ${currentLesson.quizData?.passingScore || 70}%)`
+                : `You scored ${quizState.score}%. You need ${currentLesson.quizData?.passingScore || 70}% to pass.`
+              }
+            </p>
+            
+            <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 px-2">
+              {quizState.score < (currentLesson.quizData?.passingScore || 70) && (
+                <button 
+                  onClick={() => {
+                    setQuizState({
+                      isActive: false,
+                      currentQuestion: 0,
+                      answers: {},
+                      timeRemaining: null,
+                      isSubmitted: false,
+                      score: null,
+                      showResults: false
+                    });
+                  }}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-sm sm:text-base w-full sm:w-auto"
+                >
+                  Retake Quiz
+                </button>
+              )}
+              
+              <button 
+                onClick={() => setCurrentLesson(null)}
+                className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-semibold text-sm sm:text-base w-full sm:w-auto"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
       </div>
+    )}
+  </div>
+) : currentLesson.type === 'assignment' ? (
+    <div className="flex-1 overflow-y-auto ">
+            <div className="h-screen bg-white flex flex-col px-1">
+              {!assignmentState.isActive ? (
+                // Assignment Start Screen
+                <div className="flex-1 overflow-y-auto">
+                  <div className="max-w-4xl mx-auto">
+                    <div className="text-center mb-8">
+                      <div className="text-6xl mb-4">📋</div>
+                      <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                        {currentLesson.assignmentData?.title || currentLesson.title}
+                      </h2>
+                      <p className="text-gray-600 text-lg leading-relaxed">
+                        {currentLesson.assignmentData?.description || 'Complete this assignment to demonstrate your learning'}
+                      </p>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                      {/* Instructions */}
+                      <div className="bg-blue-50 rounded-lg p-6">
+                        <h3 className="font-semibold text-blue-900 mb-4 flex items-center">
+                          <span className="mr-2">📝</span>
+                          Instructions
+                        </h3>
+                        <ol className="space-y-2 text-blue-800">
+                          {(currentLesson.assignmentData?.instructions || [
+                            'Read the assignment requirements carefully',
+                            'Complete all deliverables',
+                            'Submit your work when finished'
+                          ]).map((instruction, index) => (
+                            <li key={index} className="flex items-start">
+                              <span className="font-semibold mr-2 mt-1 text-blue-600">{index + 1}.</span>
+                              <span>{instruction}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                      
+                      {/* Deliverables */}
+                      <div className="bg-green-50 rounded-lg p-6">
+                        <h3 className="font-semibold text-green-900 mb-4 flex items-center">
+                          <span className="mr-2">📦</span>
+                          Deliverables
+                        </h3>
+                        <ul className="space-y-2 text-green-800">
+                          {(currentLesson.assignmentData?.deliverables || [
+                            'Written response to assignment questions',
+                            'Supporting documentation or examples'
+                          ]).map((deliverable, index) => (
+                            <li key={index} className="flex items-start">
+                              <span className="text-green-600 mr-2">•</span>
+                              <span>{deliverable}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                    
+                    {/* Assignment Info */}
+                    <div className="bg-gray-50 rounded-lg p-6 mb-8">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                        <div>
+                          <div className="font-semibold text-gray-900">Estimated Time</div>
+                          <div className="text-2xl font-bold text-emerald-600">
+                            {currentLesson.assignmentData?.estimatedTime || currentLesson.duration}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="font-semibold text-gray-900">Format</div>
+                          <div className="text-lg text-gray-700">
+                            {currentLesson.assignmentData?.submissionFormat || 'Text/File Upload'}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="font-semibold text-gray-900">Grading</div>
+                          <div className="text-lg text-gray-700">Rubric-based</div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="text-center">
+                      <button 
+                        onClick={() => startAssignment(currentLesson)}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-lg font-semibold text-lg transition-colors"
+                      >
+                        Start Assignment
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : !assignmentState.isSubmitted ? (
+                // Assignment Submission Screen
+                <div className="flex-1 flex flex-col">
+                  {/* Header */}
+                  <div className="bg-emerald-600 text-white p-4">
+                    <h3 className="font-semibold">{currentLesson.assignmentData?.title || currentLesson.title}</h3>
+                    <div className="text-sm opacity-90">Complete and submit your assignment</div>
+                  </div>
+                  
+                  {/* Content */}
+                  <div className="flex-1 overflow-y-auto  bg-white">
+                    <div className="max-w-4xl mx-auto space-y-8">
+                      {/* Submission Areas for each deliverable */}
+                      {(currentLesson.assignmentData?.deliverables || ['Assignment Response']).map((deliverable, index) => (
+                        <div key={index} className="bg-gray-50 rounded-lg p-6">
+                          <h4 className="font-semibold text-gray-900 mb-4">
+                            {index + 1}. {deliverable}
+                          </h4>
+                          
+                          <textarea
+                            placeholder={`Provide your work for: ${deliverable}`}
+                            value={assignmentState.submissions[deliverable] || ''}
+                            onChange={(e) => handleAssignmentSubmission(deliverable, e.target.value)}
+                            className="w-full h-32 p-4 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                          />
+                          
+                          {/* File Upload */}
+                          <div className="mt-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Upload supporting files (optional)
+                            </label>
+                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors">
+                              <input
+                                type="file"
+                                multiple
+                                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                                onChange={(e) => handleFileUpload(Array.from(e.target.files))}
+                                className="hidden"
+                                id={`file-upload-${index}`}
+                              />
+                              <label htmlFor={`file-upload-${index}`} className="cursor-pointer">
+                                <div className="text-gray-600">
+                                  <span className="text-2xl block mb-2">📎</span>
+                                  Click to upload files or drag and drop
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  PDF, DOC, DOCX, PNG, JPG up to 10MB each
+                                </div>
+                              </label>
+                            </div>
+                            
+                            {assignmentState.files.length > 0 && (
+                              <div className="mt-4">
+                                <div className="text-sm font-medium text-gray-700 mb-2">Uploaded Files:</div>
+                                <div className="space-y-2">
+                                  {assignmentState.files.map((file, fileIndex) => (
+                                    <div key={fileIndex} className="flex items-center justify-between bg-white p-2 rounded border">
+                                      <span className="text-sm text-gray-700">{file.name}</span>
+                                      <button
+                                        onClick={() => {
+                                          setAssignmentState(prev => ({
+                                            ...prev,
+                                            files: prev.files.filter((_, i) => i !== fileIndex)
+                                          }));
+                                        }}
+                                        className="text-red-600 hover:text-red-800 text-sm"
+                                      >
+                                        Remove
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {/* Submission Summary */}
+                      <div className="bg-blue-50 rounded-lg p-6">
+                        <h4 className="font-semibold text-blue-900 mb-4">Submission Checklist</h4>
+                        <div className="space-y-2">
+                          {(currentLesson.assignmentData?.deliverables || ['Assignment Response']).map((deliverable, index) => (
+                            <div key={index} className="flex items-center">
+                              <div className={`w-5 h-5 rounded-full mr-3 flex items-center justify-center text-xs ${
+                                assignmentState.submissions[deliverable]?.trim() 
+                                  ? 'bg-green-600 text-white' 
+                                  : 'bg-gray-300 text-gray-600'
+                              }`}>
+                                {assignmentState.submissions[deliverable]?.trim() ? '✓' : index + 1}
+                              </div>
+                              <span className={assignmentState.submissions[deliverable]?.trim() ? 'text-green-800' : 'text-gray-600'}>
+                                {deliverable}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Footer */}
+                  {/* Footer */}
+                  <div className="border-t bg-gray-50 p-4">
+                    <div className="flex justify-between items-center max-w-4xl mx-auto">
+                      <button
+                        onClick={() => setCurrentLesson(null)}
+                        className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      
+                      <button
+                        onClick={handleAssignmentSubmit}
+                        disabled={!isAssignmentComplete()}
+                        className="px-8 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold"
+                      >
+                        Submit Assignment
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // Assignment Submitted Screen
+                <div className="flex-1 flex items-center justify-center p-8">
+                  <div className="text-center max-w-2xl">
+                    <div className="text-6xl mb-6">✅</div>
+                    
+                    <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                      Assignment Submitted!
+                    </h2>
+                    
+                    <p className="text-gray-600 mb-8 text-lg leading-relaxed">
+                      Your assignment has been submitted successfully. You will receive feedback within 3-5 business days.
+                    </p>
+                    
+                    <div className="bg-green-50 rounded-lg p-6 mb-8">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
+                        <div>
+                          <div className="font-semibold text-green-900">Submitted</div>
+                          <div className="text-lg text-green-700">
+                            {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="font-semibold text-green-900">Status</div>
+                          <div className="text-lg text-green-700">Under Review</div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-center space-x-4">
+                      <button 
+                        onClick={() => {
+                          // Mark lesson as complete
+                          markLessonComplete(currentLesson.id);
+                          setCurrentLesson(null);
+                        }}
+                        className="px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-semibold"
+                      >
+                        Continue Learning
+                      </button>
+                      
+                      <button 
+                        onClick={() => setCurrentLesson(null)}
+                        className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-semibold"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            </div>
+          ) : currentLesson.type === 'reading' ? (
+            <div className="h-screen bg-white overflow-y-auto">
+              {/* Close button for mobile */}
+              <button 
+                onClick={() => setCurrentLesson(null)}
+                className="fixed top-4 right-4 z-20 text-gray-600 bg-white shadow-lg w-10 h-10 rounded-full flex items-center justify-center sm:hidden"
+              >
+                ✕
+              </button>
+
+              <div className="max-w-4xl mx-auto p-8">
+                <div className="prose prose-lg max-w-none">
+                  <h1 className="text-3xl font-bold text-gray-900 mb-6">
+                    {currentLesson.title}
+                  </h1>
+                  
+                  {currentLesson.readingData?.content ? (
+                    <div dangerouslySetInnerHTML={{ __html: currentLesson.readingData.content }} />
+                  ) : (
+                    <div className="space-y-6 text-gray-700 leading-relaxed">
+                      <p>
+                        This reading material covers important concepts that will help you understand the topic better. 
+                        Take your time to read through the content and make notes of key points.
+                      </p>
+                      
+                      <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">Key Learning Objectives</h2>
+                      <ul className="list-disc list-inside space-y-2 ml-4">
+                        <li>Understand the fundamental concepts</li>
+                        <li>Learn practical applications</li>
+                        <li>Identify best practices</li>
+                        <li>Prepare for upcoming assessments</li>
+                      </ul>
+                      
+                      <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">Introduction</h2>
+                      <p>
+                        This comprehensive reading material has been carefully curated to provide you with essential 
+                        knowledge and insights. The content is structured to build upon previous lessons and prepare 
+                        you for advanced topics.
+                      </p>
+                      
+                      <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">Main Content</h2>
+                      <p>
+                        The main content of this reading would typically include detailed explanations, examples, 
+                        case studies, and practical applications relevant to the course material. This would be 
+                        populated with the actual reading content from your course materials.
+                      </p>
+                      
+                      <div className="bg-blue-50 border-l-4 border-blue-400 p-4 my-6">
+                        <div className="font-semibold text-blue-900 mb-2">💡 Pro Tip</div>
+                        <p className="text-blue-800">
+                          Take notes while reading and highlight important concepts. This will help you during 
+                          quizzes and assignments.
+                        </p>
+                      </div>
+                      
+                      <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">Summary</h2>
+                      <p>
+                        In this reading, we've covered the essential concepts that form the foundation of this topic. 
+                        Make sure you understand these key points before moving on to the next lesson.
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Reading Progress */}
+                  <div className="mt-12 pt-8 border-t border-gray-200">
+                    <div className="flex items-center justify-between bg-green-50 rounded-lg p-4">
+                      <div className="flex items-center">
+                        <div className="text-green-600 text-2xl mr-3">📖</div>
+                        <div>
+                          <div className="font-semibold text-green-900">Reading Complete</div>
+                          <div className="text-sm text-green-700">Mark as read when finished</div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          markLessonComplete(currentLesson.id);
+                          setCurrentLesson(null);
+                        }}
+                        className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
+                      >
+                        Mark as Read
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            // Default content for other lesson types
+            <div className="h-full bg-white flex items-center justify-center">
+              <div className="text-center">
+                <div className="text-4xl mb-4">📚</div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  {currentLesson.title}
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  {currentLesson.type} • {currentLesson.duration}
+                </p>
+                <p className="text-gray-500">
+                  Content for this lesson type is not yet available.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Sidebar - Hidden in fullscreen and mobile */}
+        {!isFullscreen && (
+          <div className="hidden sm:block sm:w-80 lg:w-96 border-l bg-gray-50 overflow-y-auto">
+            {/* Lesson Info */}
+            <div className="p-4 border-b bg-white">
+              <h4 className="font-semibold text-gray-900 mb-2">{currentLesson.title}</h4>
+              <div className="flex items-center text-sm text-gray-600 mb-3">
+                <span className="capitalize">{currentLesson.type}</span>
+                <span className="mx-2">•</span>
+                <span>{currentLesson.duration}</span>
+              </div>
+              
+              {/* Lesson Progress */}
+              <div className="bg-gray-200 rounded-full h-2 mb-2">
+                <div 
+                  className="bg-emerald-600 h-2 rounded-full transition-all"
+                  style={{ 
+                    width: `${getLessonProgress(currentLesson.id)}%` 
+                  }}
+                />
+              </div>
+              <div className="text-xs text-gray-500">
+                {getLessonProgress(currentLesson.id)}% complete
+              </div>
+            </div>
+            
+            {/* Course Navigation */}
+           <div className="p-4">
+  <h5 className="font-semibold text-gray-900 mb-4">Course Content</h5>
+
+  {/* Scrollable wrapper */}
+  <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
+    {course.modules?.map(section => (
+      <div key={section.id}>
+        <div className="font-medium text-gray-800 mb-2">{section.title}</div>
+        {section.lessons?.map(lesson => (
+          <button
+            key={lesson.id}
+            onClick={() => setCurrentLesson(lesson)}
+            className={`w-full text-left p-3 rounded-lg text-sm transition-colors ${
+              currentLesson.id === lesson.id
+                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                : 'hover:bg-gray-100 text-gray-700'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className={`w-6 h-6 rounded-full mr-3 flex items-center justify-center text-xs ${
+                  completedLessons.includes(lesson.id)
+                    ? 'bg-green-600 text-white'
+                    : currentLesson.id === lesson.id
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-gray-300 text-gray-600'
+                }`}>
+                  {completedLessons.includes(lesson.id) ? '✓' : 
+                   lesson.type === 'video' ? '▶' :
+                   lesson.type === 'quiz' ? '?' :
+                   lesson.type === 'reading' ? '📖' :
+                   lesson.type === 'assignment' ? '📝' : '•'}
+                </div>
+                <div>
+                  <div className="font-medium">{lesson.title}</div>
+                  <div className="text-xs text-gray-500">
+                    {lesson.type} • {lesson.duration}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    ))}
+  </div>
+</div>
+
+            
+            {/* Notes Section */}
+            <div className="p-4 border-t">
+              <h5 className="font-semibold text-gray-900 mb-4">Lesson Notes</h5>
+              <textarea
+                placeholder="Add your notes for this lesson..."
+                value={lessonNotes[currentLesson.id] || ''}
+                onChange={(e) => setLessonNotes(prev => ({
+                  ...prev,
+                  [currentLesson.id]: e.target.value
+                }))}
+                className="w-full h-32 p-3 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
-    </DashboardLayout>
+  </div>
+)}
+
+      {/* Main Course Page Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+        {/* Hero Section */}
+        <div className="bg-gray-900 text-white rounded-lg lg:rounded-xl overflow-hidden mb-8">
+          <div className="flex flex-col lg:flex-row">
+            {/* Course Info */}
+            <div className="flex-1 p-6 lg:p-8">
+              <div className="flex flex-wrap items-center gap-2 mb-4">
+                <span className="bg-emerald-600 text-xs px-2 py-1 rounded-full">{course.category}</span>
+                <span className="bg-blue-600 text-xs px-2 py-1 rounded-full">{course.level}</span>
+                <div className="flex items-center text-yellow-400 text-sm">
+                  <span className="mr-1">⭐</span>
+                  <span>{course.rating}</span>
+                  <span className="text-gray-300 ml-1">({course.studentsCount.toLocaleString()} students)</span>
+                </div>
+              </div>
+              
+              <h1 className="text-2xl lg:text-3xl xl:text-4xl font-bold mb-4">{course.title}</h1>
+              
+              <p className="text-gray-300 mb-6 text-sm sm:text-base leading-relaxed">
+                {showFullDescription ? course.description : `${course.description.slice(0, 200)}...`}
+                <button 
+                  onClick={() => setShowFullDescription(!showFullDescription)}
+                  className="text-emerald-400 hover:text-emerald-300 ml-2 underline"
+                >
+                  {showFullDescription ? 'Show less' : 'Show more'}
+                </button>
+              </p>
+
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{course.duration}</div>
+                  <div className="text-sm text-gray-300">Total hours</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{totalLessons}</div>
+                  <div className="text-sm text-gray-300">Lessons</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{course.modules.length}</div>
+                  <div className="text-sm text-gray-300">Modules</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{course.level}</div>
+                  <div className="text-sm text-gray-300">Level</div>
+                </div>
+              </div>
+
+              {/* Enrollment Status */}
+              {isEnrolled && (
+                <div className="bg-emerald-600 bg-opacity-20 border border-emerald-500 rounded-lg p-4 mb-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold text-emerald-400">Enrolled since {enrollmentDate}</div>
+                      <div className="text-sm text-gray-300">{completedLessons}/{totalLessons} lessons completed ({Math.round(completionPercentage)}%)</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="w-16 h-16 bg-emerald-600 rounded-full flex items-center justify-center text-lg font-bold">
+                        {Math.round(completionPercentage)}%
+                      </div>
+                    </div>
+                  </div>
+                  <div className="w-full bg-gray-700 rounded-full h-2 mt-4">
+                    <div 
+                      className="bg-emerald-600 h-2 rounded-full transition-all duration-500"
+                      style={{ width: `${completionPercentage}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                {isEnrolled ? (
+                  <button 
+                    onClick={handleContinueLearning}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
+                  >
+                    Continue Learning
+                  </button>
+                ) : (
+                  <>
+                    <button 
+                      onClick={handleEnroll}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
+                    >
+                      Enroll Now - ${course.price}
+                    </button>
+                    <button 
+                      onClick={handleAddToCart}
+                      className="bg-gray-700 hover:bg-gray-600 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
+                    >
+                      Add to Cart
+                    </button>
+                  </>
+                )}
+                
+                <button 
+                  onClick={() => setShowVideo(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors flex items-center justify-center"
+                >
+                  <span className="mr-2">▶️</span>
+                  Preview
+                </button>
+                
+                <button 
+                  onClick={handleAddToWishlist}
+                  className="bg-gray-700 hover:bg-gray-600 text-white py-3 px-4 rounded-lg transition-colors"
+                >
+                  ❤️
+                </button>
+              </div>
+            </div>
+
+            {/* Course Thumbnail */}
+            <div className="lg:w-80 xl:w-96">
+              <div className="relative h-48 lg:h-full">
+                <img 
+                  src={course.thumbnail} 
+                  alt={course.title}
+                  className="w-full h-full object-cover"
+                />
+                <button 
+                  onClick={() => setShowVideo(true)}
+                  className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 hover:bg-opacity-50 transition-colors group"
+                >
+                  <div className="w-16 h-16 bg-white bg-opacity-90 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <span className="text-2xl text-gray-800 ml-1">▶️</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs Navigation */}
+        <div className="border-b border-gray-200 mb-8">
+          <nav className="flex space-x-8 overflow-x-auto pb-2">
+            {[
+              { id: 'overview', label: 'Overview', icon: '📋' },
+              { id: 'curriculum', label: 'Curriculum', icon: '📚' },
+              { id: 'instructor', label: 'Instructor', icon: '👨‍🏫' },
+              { id: 'reviews', label: 'Reviews', icon: '⭐' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center space-x-2 px-1 py-2 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-emerald-500 text-emerald-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        {/* Tab Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2">
+            {activeTab === 'overview' && (
+              <div className="space-y-8">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-4">About this course</h2>
+                  <div className="prose prose-gray max-w-none">
+                    <p className="text-gray-600 leading-relaxed">{course.description}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-4">What you'll learn</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {course.learningOutcomes?.map((outcome, index) => (
+                      <div key={index} className="flex items-start space-x-3">
+                        <span className="text-emerald-600 mt-1">✓</span>
+                        <span className="text-gray-700">{outcome}</span>
+                      </div>
+                    )) || [
+                      "Master modern crop management techniques",
+                      "Understand sustainable farming practices",
+                      "Learn about soil health and nutrition",
+                      "Implement integrated pest management",
+                      "Use technology in agriculture",
+                      "Develop farm business strategies"
+                    ].map((outcome, index) => (
+                      <div key={index} className="flex items-start space-x-3">
+                        <span className="text-emerald-600 mt-1">✓</span>
+                        <span className="text-gray-700">{outcome}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-4">Requirements</h3>
+                  <ul className="space-y-2 text-gray-600">
+                    <li>• Basic understanding of agriculture</li>
+                    <li>• Access to farming land (optional for practical exercises)</li>
+                    <li>• Willingness to learn and apply new techniques</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'curriculum' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-gray-900">Course Content</h2>
+                  <div className="text-sm text-gray-600">
+                    {course.modules.length} modules • {totalLessons} lessons • {course.duration} total
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {course.modules.map((module) => (
+                    <div key={module.id} className="border border-gray-200 rounded-lg">
+                      <button
+                        onClick={() => setSelectedModule(selectedModule === module.id ? null : module.id)}
+                        className="w-full px-6 py-4 text-left hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="font-semibold text-gray-900">{module.title}</h3>
+                            <p className="text-sm text-gray-600 mt-1">
+                              {module.lessons.length} lessons • {module.duration}
+                            </p>
+                          </div>
+                          <span className={`transform transition-transform ${selectedModule === module.id ? 'rotate-180' : ''}`}>
+                            ↓
+                          </span>
+                        </div>
+                      </button>
+
+                      {selectedModule === module.id && (
+                        <div className="border-t border-gray-200">
+                          {module.lessons.map((lesson) => (
+                            <div
+                              key={lesson.id}
+                              id={`lesson-${lesson.id}`}
+                              className="px-6 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
+                            >
+                              <div className="flex items-center space-x-3">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
+                                  progress[lesson.id]?.completed 
+                                    ? 'bg-emerald-600 text-white' 
+                                    : 'bg-gray-200 text-gray-600'
+                                }`}>
+                                  {progress[lesson.id]?.completed ? '✓' : 
+                                   lesson.type === 'video' ? '▶️' : 
+                                   lesson.type === 'quiz' ? '❓' : '📝'}
+                                </div>
+                                <div>
+                                  <div className="font-medium text-gray-900">{lesson.title}</div>
+                                  <div className="text-sm text-gray-500 capitalize">
+                                    {lesson.type} • {lesson.duration}
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center space-x-2">
+                                {isEnrolled && (
+                                  <button
+                                    onClick={() => handleStartLesson(lesson)}
+                                    className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                                  >
+                                    {progress[lesson.id]?.completed ? 'Review' : 'Start'}
+                                  </button>
+                                )}
+                                {lesson.type === 'video' && (
+                                  <span className="text-xs text-gray-400">Preview</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'instructor' && (
+              <div className="space-y-6">
+                <h2 className="text-2xl font-bold text-gray-900">Instructor</h2>
+                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                  <div className="flex items-start space-x-4">
+                    <img 
+                      src={course.instructor?.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face'} 
+                      alt={course.instructor?.name || 'Dr. Sarah Johnson'}
+                      className="w-16 h-16 rounded-full object-cover"
+                    />
+                    <div className="flex-1">
+                      <h3 className="text-xl font-semibold text-gray-900">{course.instructor?.name || 'Dr. Sarah Johnson'}</h3>
+                      <p className="text-gray-600 mb-4">{course.instructor?.title || 'Agricultural Science Professor & Consultant'}</p>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
+                        <div className="text-center">
+                          <div className="font-semibold text-gray-900">4.8</div>
+                          <div className="text-gray-600">Instructor Rating</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-semibold text-gray-900">2,847</div>
+                          <div className="text-gray-600">Reviews</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-semibold text-gray-900">15,629</div>
+                          <div className="text-gray-600">Students</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-semibold text-gray-900">12</div>
+                          <div className="text-gray-600">Courses</div>
+                        </div>
+                      </div>
+                      
+                      <p className="text-gray-600 leading-relaxed">
+                        {course.instructor?.bio || 'Dr. Johnson has over 15 years of experience in agricultural research and education. She specializes in sustainable farming practices and has published numerous papers on crop management techniques.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+           {activeTab === 'reviews' && (
+  <div className="space-y-6">
+    <div className="flex items-center justify-between">
+      <h2 className="text-2xl font-bold text-gray-900">Student Reviews</h2>
+      <div className="flex items-center space-x-2">
+        <span className="text-2xl font-bold text-gray-900">{course.rating}</span>
+        <div className="flex text-yellow-400">
+          {[1,2,3,4,5].map(star => (
+            <span key={star}>⭐</span>
+          ))}
+        </div>
+        <span className="text-gray-600">({course.reviewsCount.toLocaleString()} reviews)</span>
+      </div>
+    </div>
+
+    {/* Rating Breakdown */}
+    <div className="bg-gray-50 rounded-lg p-6">
+      <div className="space-y-3">
+        {[5,4,3,2,1].map(rating => (
+          <div key={rating} className="flex items-center space-x-4">
+            <span className="text-sm font-medium w-8">{rating}★</span>
+            <div className="flex-1 bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-yellow-400 h-2 rounded-full"
+                style={{ width: `${rating === 5 ? 70 : rating === 4 ? 20 : rating === 3 ? 8 : 2}%` }}
+              />
+            </div>
+            <span className="text-sm text-gray-600 w-12">{rating === 5 ? '70%' : rating === 4 ? '20%' : rating === 3 ? '8%' : '2%'}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    {/* Reviews from course.reviews */}
+    <div className="space-y-6">
+      {course.reviews?.map((review) => (
+        <div key={review.id} className="border-b border-gray-200 pb-6">
+          <div className="flex items-start space-x-4">
+            <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium">
+              {review.student.split(' ').map(n => n[0]).join('')}
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center space-x-2 mb-2">
+                <span className="font-medium text-gray-900">{review.student}</span>
+                <div className="flex text-yellow-400 text-sm">
+                  {[1,2,3,4,5].map(star => (
+                    <span key={star}>{star <= review.rating ? '⭐' : '☆'}</span>
+                  ))}
+                </div>
+                <span className="text-sm text-gray-500">
+                  {new Date(review.date).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </span>
+              </div>
+              <p className="text-gray-600 leading-relaxed mb-3">{review.comment}</p>
+              <div className="flex items-center space-x-4">
+                <button className="flex items-center space-x-1 text-sm text-gray-500 hover:text-gray-700">
+                  <span>👍</span>
+                  <span>Helpful ({review.helpful})</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Course Stats Card */}
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <h3 className="font-semibold text-gray-900 mb-4">Course Information</h3>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Duration</span>
+                  <span className="font-medium">{course.duration}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Lessons</span>
+                  <span className="font-medium">{totalLessons}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Level</span>
+                  <span className="font-medium">{course.level}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Language</span>
+                  <span className="font-medium">English</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Certificate</span>
+                  <span className="font-medium">Yes</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Related Courses */}
+            {relatedCourses.length > 0 && (
+              <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <h3 className="font-semibold text-gray-900 mb-4">Related Courses</h3>
+                <div className="space-y-4">
+                  {relatedCourses.map((relatedCourse) => (
+                    <div key={relatedCourse.id} className="flex space-x-3">
+                      <img 
+                        src={relatedCourse.thumbnail} 
+                        alt={relatedCourse.title}
+                        className="w-16 h-12 rounded object-cover"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-sm text-gray-900 line-clamp-2">{relatedCourse.title}</h4>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-xs text-gray-500">{relatedCourse.instructor?.name || 'Various'}</span>
+                          <span className="font-semibold text-sm text-emerald-600">${relatedCourse.price}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 
-export default AdminAddCourse;
+export default CourseDetailPage;
+                      
+

@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import useCourseStore from '../store/courseStore';
+import useUserStore from '../store/userStore';
+const CourseDetailPage = () => {
+    const { courseSlug } = useParams();
+  const [searchParams] = useSearchParams();
+  const courseId = searchParams.get('cid');
+  const demoSlug = courseId;
 
-const CourseDetailPage = ({ courseSlug }) => {
-  const demoSlug = courseSlug || 'modern-crop-management-techniques';
+
   const [activeTab, setActiveTab] = useState('overview');
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [selectedModule, setSelectedModule] = useState(null);
@@ -16,245 +22,88 @@ const CourseDetailPage = ({ courseSlug }) => {
   const [showControls, setShowControls] = useState(true);
   const [videoError, setVideoError] = useState(false);
   const [lessonNotes, setLessonNotes] = useState({});
-const [completedLessons, setCompletedLessons] = useState([]);
+  const [reviewForm, setReviewForm] = useState({
+    rating: 5,
+    comment: '',
+    isSubmitting: false
+  });
+  const { isLoggedIn, user, login, logout } = useUserStore();
+  const  userId = user?.id
   const videoRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
+
   const [quizState, setQuizState] = useState({
-  isActive: false,
-  currentQuestion: 0,
-  answers: {},
-  timeRemaining: null,
-  isSubmitted: false,
-  score: null,
-  showResults: false
-});
-
-const [assignmentState, setAssignmentState] = useState({
-  isActive: false,
-  submissions: {},
-  isSubmitted: false,
-  files: []
-});
-const getLessonProgress = (lessonId) => {
-  if (completedLessons.includes(lessonId)) {
-    return 100;
-  }
-  
-  // Check video progress
-  if (videoProgress[lessonId]) {
-    return Math.round(videoProgress[lessonId].progress || 0);
-  }
-  
-  // Check quiz progress
-  if (quizState.isActive && currentLesson?.id === lessonId) {
-    return Math.round((quizState.currentQuestion / (currentLesson.quizData?.questions?.length || 1)) * 100);
-  }
-
-  // Check assignment progress
-  if (assignmentState.isActive && currentLesson?.id === lessonId) {
-    const totalDeliverables = currentLesson.assignmentData?.deliverables?.length || 1;
-    const completedDeliverables = Object.values(assignmentState.submissions).filter(sub => sub?.trim()).length;
-    return Math.round((completedDeliverables / totalDeliverables) * 100);
-  }
-  
-  return 0;
-};
-
-const markLessonComplete = (lessonId) => {
-  setCompletedLessons(prev => {
-    if (!prev.includes(lessonId)) {
-      return [...prev, lessonId];
-    }
-    return prev;
-  });
-};
-
-const isAssignmentComplete = () => {
-  if (!currentLesson?.assignmentData?.deliverables) {
-    return assignmentState.submissions['Assignment Response']?.trim();
-  }
-  
-  return currentLesson.assignmentData.deliverables.every(deliverable => 
-    assignmentState.submissions[deliverable]?.trim()
-  );
-};
-const handleAssignmentSubmit = () => {
-  if (!isAssignmentComplete()) {
-    alert('Please complete all deliverables before submitting');
-    return;
-  }
-  
-  setAssignmentState(prev => ({
-    ...prev,
-    isSubmitted: true
-  }));
-  
-  // Here you would typically send the assignment data to your backend
-  console.log('Assignment submitted:', {
-    lessonId: currentLesson.id,
-    submissions: assignmentState.submissions,
-    files: assignmentState.files
-  });
-};
-
-useEffect(() => {
-  let timer;
-  if (quizState.isActive && quizState.timeRemaining > 0 && !quizState.isSubmitted) {
-    timer = setInterval(() => {
-      setQuizState(prev => ({
-        ...prev,
-        timeRemaining: prev.timeRemaining - 1
-      }));
-    }, 1000);
-  } else if (quizState.timeRemaining === 0 && !quizState.isSubmitted) {
-    handleQuizSubmit();
-  }
-  return () => clearInterval(timer);
-}, [quizState.isActive, quizState.timeRemaining, quizState.isSubmitted]);
-
-// Quiz Functions
-const startQuiz = (lesson) => {
-  const quizData = lesson.quizData;
-  setQuizState({
-    isActive: true,
+    isActive: false,
     currentQuestion: 0,
     answers: {},
-    timeRemaining: quizData.timeLimit * 60, // convert minutes to seconds
+    timeRemaining: null,
     isSubmitted: false,
     score: null,
     showResults: false
   });
-  setCurrentLesson(lesson);
-};
 
-const handleQuizAnswer = (questionId, answer) => {
-  setQuizState(prev => ({
-    ...prev,
-    answers: {
-      ...prev.answers,
-      [questionId]: answer
-    }
-  }));
-};
-
-const handleQuizSubmit = () => {
-  const lesson = currentLesson;
-  const quizData = lesson.quizData;
-  let correctCount = 0;
-  
-  quizData.questions.forEach(question => {
-    const userAnswer = quizState.answers[question.id];
-    
-    if (question.type === 'multiple-select') {
-      const correctAnswers = question.correctAnswers;
-      const userAnswers = userAnswer || [];
-      
-      if (correctAnswers.length === userAnswers.length && 
-          correctAnswers.every(ans => userAnswers.includes(ans))) {
-        correctCount++;
-      }
-    } else {
-      if (userAnswer === question.correctAnswer) {
-        correctCount++;
-      }
-    }
-  });
-  
-  const score = Math.round((correctCount / quizData.questions.length) * 100);
-  const passed = score >= quizData.passingScore;
-  
-  setQuizState(prev => ({
-    ...prev,
-    isSubmitted: true,
-    score: score,
-    showResults: true
-  }));
-  
-  // Update progress if passed
-  if (passed) {
-    updateCourseProgress(course.id, lesson.id, true);
-    handleLessonComplete(lesson.id);
-  }
-};
-
-const nextQuestion = () => {
-  setQuizState(prev => ({
-    ...prev,
-    currentQuestion: Math.min(prev.currentQuestion + 1, currentLesson.quizData.questions.length - 1)
-  }));
-};
-
-const previousQuestion = () => {
-  setQuizState(prev => ({
-    ...prev,
-    currentQuestion: Math.max(prev.currentQuestion - 1, 0)
-  }));
-};
-
-// Assignment Functions
-const startAssignment = (lesson) => {
-  setAssignmentState({
-    isActive: true,
+  const [assignmentState, setAssignmentState] = useState({
+    isActive: false,
     submissions: {},
     isSubmitted: false,
     files: []
   });
-  setCurrentLesson(lesson);
-};
 
-const handleAssignmentSubmission = (field, value) => {
-  setAssignmentState(prev => ({
-    ...prev,
-    submissions: {
-      ...prev.submissions,
-      [field]: value
-    }
-  }));
-};
-
-const handleFileUpload = (files) => {
-  setAssignmentState(prev => ({
-    ...prev,
-    files: [...prev.files, ...files]
-  }));
-};
-
-const submitAssignment = () => {
-  setAssignmentState(prev => ({
-    ...prev,
-    isSubmitted: true
-  }));
-  
-  // Mark lesson as completed
-  updateCourseProgress(course.id, currentLesson.id, true);
-  handleLessonComplete(currentLesson.id);
-  
-  alert('Assignment submitted successfully!');
-};
-
-
-
+  // Get store state and actions
   const {
-    courses,
-    getCoursesByCategory,
+    selectedCourse,
+    userProgress,
+    enrolledCourses,
+    loading,
+    error,
+    fetchCourseById,
+    enrollInCourse,
+    updateLessonProgress,
+    submitQuizResult,
+    submitAssignment,
+    submitReview,
     getCourseProgress,
     getCourseCompletionPercentage,
-    updateCourseProgress,
-    enrollInCourse,
-    isEnrolledInCourse
+    isEnrolledInCourse,
+    getCoursesByCategory,  initialize, getCompletedLessons, updateModuleProgress
   } = useCourseStore();
+  useEffect(() => {
+  if (user) {
+    initialize(user.id); // Initialize with user data
+  } else {
+    initialize(); // Initialize without user data (just categories and courses)
+  }
+}, [user]);
+  const completedLessons = getCompletedLessons(courseId);
+  // Load course data on mount
+  useEffect(() => {
+ 
+    if (demoSlug) {
+      // First try to find by slug, then by ID
+      fetchCourseById(demoSlug).then(courseData => {
+        if (!courseData) {
+          // Try parsing as ID if slug lookup failed
+          const numericId = parseInt(demoSlug);
+          if (!isNaN(numericId)) {
+            fetchCourseById(numericId);
+          }
+        }
+      });
+    }
+  }, [demoSlug, fetchCourseById]);
 
-  const course = courses.find(c => c.slug === demoSlug || c.id.toString() === demoSlug);
-  const relatedCourses = course ? getCoursesByCategory(course.categoryId).filter(c => c.id !== course.id).slice(0, 4) : [];
+  const course = selectedCourse;
+ const relatedCourses = course ? 
+  (getCoursesByCategory(course.categoryId)?.courses || []).filter(c => c.id !== course.id).slice(0, 4) : 
+  [];
+
   const progress = course ? getCourseProgress(course.id) : {};
   const completionPercentage = course ? getCourseCompletionPercentage(course.id) : 0;
   const isEnrolled = course ? isEnrolledInCourse(course.id) : false;
 
-  const [cartItems, setCartItems] = useState([]);
-  const [wishlistItems, setWishlistItems] = useState([]);
 
   useEffect(() => {
-    if (course) {
+    if (course && course.modules?.length > 0) {
       setSelectedModule(course.modules[0]?.id || null);
     }
   }, [course]);
@@ -311,6 +160,50 @@ const submitAssignment = () => {
       return () => document.removeEventListener('keydown', handleKeyPress);
     }
   }, [currentLesson, isFullscreen]);
+ console.log(course)
+  // Quiz timer effect
+  useEffect(() => {
+    let timer;
+    if (quizState.isActive && quizState.timeRemaining > 0 && !quizState.isSubmitted) {
+      timer = setInterval(() => {
+        setQuizState(prev => ({
+          ...prev,
+          timeRemaining: prev.timeRemaining - 1
+        }));
+      }, 1000);
+    } else if (quizState.timeRemaining === 0 && !quizState.isSubmitted) {
+      handleQuizSubmit();
+    }
+    return () => clearInterval(timer);
+  }, [quizState.isActive, quizState.timeRemaining, quizState.isSubmitted]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading course...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="text-center max-w-sm mx-auto">
+          <h2 className="text-xl sm:text-2xl font-bold text-red-600 mb-4">Error Loading Course</h2>
+          <p className="text-gray-600 mb-6 text-sm sm:text-base">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 transition-colors w-full sm:w-auto"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!course) {
     return (
@@ -329,29 +222,41 @@ const submitAssignment = () => {
     );
   }
 
-  const handleEnroll = () => {
-    enrollInCourse(course.id);
-    setShowCongrats(true);
-    setTimeout(() => setShowCongrats(false), 3000);
-  };
+  // Course interaction handlers
+  const handleEnroll = async () => {
+    if (!userId) {
+      alert('Please log in to enroll in courses');
+      return;
+    }
 
-  const handleAddToCart = () => {
-    if (!cartItems.includes(course.id)) {
-      setCartItems([...cartItems, course.id]);
-      alert('Course added to cart!');
+    const success = await enrollInCourse(userId, course.id);
+    if (success) {
+      setShowCongrats(true);
+      setTimeout(() => setShowCongrats(false), 3000);
+    } else {
+      alert('Failed to enroll in course. Please try again.');
     }
   };
 
-  const handleAddToWishlist = () => {
-    if (!wishlistItems.includes(course.id)) {
-      setWishlistItems([...wishlistItems, course.id]);
-      alert('Course added to wishlist!');
-    }
-  };
-
-  const handleLessonComplete = (lessonId) => {
-    updateCourseProgress(course.id, lessonId, true);
-    
+const handleLessonComplete = async (lessonId) => {
+  if (!userId) return;
+  
+  // Check if this is a synthetic lesson ID (quiz or assignment)
+  const isQuizLesson = typeof lessonId === 'string' && lessonId.startsWith('quiz-');
+  const isAssignmentLesson = typeof lessonId === 'string' && lessonId.startsWith('assignment-');
+  
+  let success = false;
+  
+  if (isQuizLesson || isAssignmentLesson) {
+    // For quiz/assignment lessons, we don't update lesson_progress
+    // Progress is handled by updateModuleProgress in the specific handlers
+    success = true;
+  } else {
+    // For regular lessons, update lesson progress normally
+    success = await updateLessonProgress(userId, lessonId, true);
+  }
+  
+  if (success) {
     // Show completion animation
     const lessonElement = document.getElementById(`lesson-${lessonId}`);
     if (lessonElement) {
@@ -360,16 +265,35 @@ const submitAssignment = () => {
         lessonElement.classList.remove('animate-pulse');
       }, 1000);
     }
-  };
+  }
+};
 
-  const handleStartLesson = (lesson) => {
-    setCurrentLesson(lesson);
-    setVideoError(false);
+const handleStartLesson = (lesson) => {
+  setCurrentLesson(lesson);
+  setVideoError(false);
+  
+  // Check if this is a quiz or assignment lesson
+  const isQuizLesson = lesson.type === 'quiz' || (typeof lesson.id === 'string' && lesson.id.startsWith('quiz-'));
+  const isAssignmentLesson = lesson.type === 'assignment' || (typeof lesson.id === 'string' && lesson.id.startsWith('assignment-'));
+  
+  // Set video states based on lesson type
+  if (isQuizLesson || isAssignmentLesson) {
+    setIsVideoLoading(false);
+    setShowVideo(false);
+  } else {
     setIsVideoLoading(true);
-    if (!progress[lesson.id]) {
-      updateCourseProgress(course.id, lesson.id, false);
+    setShowVideo(true);
+  }
+  
+  // Initialize progress tracking for new lessons
+  if (userId && !progress[lesson.id]) {
+    // Only track progress for regular lessons, not synthetic quiz/assignment lessons
+    if (!isQuizLesson && !isAssignmentLesson) {
+      updateLessonProgress(userId, lesson.id, false);
     }
-  };
+    // For quiz/assignment lessons, progress is handled when they're completed
+  }
+};
 
   const handleContinueLearning = () => {
     // Find the next incomplete lesson
@@ -386,6 +310,246 @@ const submitAssignment = () => {
         setSelectedModule(moduleWithLesson.id);
       }
     }
+  };
+
+  // Quiz Functions
+  const startQuiz = (lesson) => {
+    const quizData = lesson.quizData;
+    if (!quizData) return;
+    
+    setQuizState({
+      isActive: true,
+      currentQuestion: 0,
+      answers: {},
+      timeRemaining: quizData.timeLimit * 60, // convert minutes to seconds
+      isSubmitted: false,
+      score: null,
+      showResults: false
+    });
+    setCurrentLesson(lesson);
+  };
+
+  const handleQuizAnswer = (questionId, answer) => {
+    setQuizState(prev => ({
+      ...prev,
+      answers: {
+        ...prev.answers,
+        [questionId]: answer
+      }
+    }));
+  };
+
+const handleQuizSubmit = async () => {
+  if (!userId || !currentLesson?.quizData) return;
+  
+  const quizData = currentLesson.quizData;
+  let correctCount = 0;
+  
+  quizData.questions.forEach(question => {
+    const userAnswer = quizState.answers[question.id];
+    
+    if (question.type === 'multiple-select') {
+      const correctAnswers = question.correctAnswers || [];
+      const userAnswers = userAnswer || [];
+      
+      if (correctAnswers.length === userAnswers.length &&
+          correctAnswers.every(ans => userAnswers.includes(ans))) {
+        correctCount++;
+      }
+    } else {
+      if (userAnswer === question.correctAnswer) {
+        correctCount++;
+      }
+    }
+  });
+  
+  const score = Math.round((correctCount / quizData.questions.length) * 100);
+  const passed = score >= (quizData.passingScore || 70);
+  
+  setQuizState(prev => ({
+    ...prev,
+    isSubmitted: true,
+    score: score,
+    showResults: true
+  }));
+  
+  // Submit quiz result to backend
+  await submitQuizResult(userId, quizData.id, score);
+  
+  // Update progress if passed - use updateModuleProgress for quiz completion
+  if (passed) {
+    // Find the module ID for this quiz
+    const moduleId = currentModule?.id; // Assuming you have currentModule available
+    
+    await updateModuleProgress(userId, moduleId, 'quiz', {
+      quizId: quizData.id,
+      score: score,
+      answers: quizState.answers
+    });
+    
+    // Show completion animation for the quiz lesson
+    await handleLessonComplete(currentLesson.id);
+  }
+};
+
+  const nextQuestion = () => {
+    setQuizState(prev => ({
+      ...prev,
+      currentQuestion: Math.min(prev.currentQuestion + 1, currentLesson.quizData.questions.length - 1)
+    }));
+  };
+
+  const previousQuestion = () => {
+    setQuizState(prev => ({
+      ...prev,
+      currentQuestion: Math.max(prev.currentQuestion - 1, 0)
+    }));
+  };
+
+  // Assignment Functions
+  const startAssignment = (lesson) => {
+    setAssignmentState({
+      isActive: true,
+      submissions: {},
+      isSubmitted: false,
+      files: []
+    });
+    setCurrentLesson(lesson);
+  };
+
+  const handleAssignmentSubmission = (field, value) => {
+    setAssignmentState(prev => ({
+      ...prev,
+      submissions: {
+        ...prev.submissions,
+        [field]: value
+      }
+    }));
+  };
+
+  const handleFileUpload = (files) => {
+    setAssignmentState(prev => ({
+      ...prev,
+      files: [...prev.files, ...files]
+    }));
+  };
+
+const handleAssignmentSubmit = async () => {
+  if (!userId || !currentLesson?.assignmentData) return;
+  
+  if (!isAssignmentComplete()) {
+    alert('Please complete all deliverables before submitting');
+    return;
+  }
+  
+  // Prepare submission content
+  const submissionContent = {
+    submissions: assignmentState.submissions,
+    files: assignmentState.files.map(file => ({
+      name: file.name,
+      size: file.size,
+      type: file.type
+    }))
+  };
+  
+  // Submit assignment to backend
+  const success = await submitAssignment(
+    userId, 
+    currentLesson.assignmentData.id, 
+    JSON.stringify(submissionContent),
+    assignmentState.files // Pass actual files array
+  );
+  
+  if (success) {
+    // Find the module ID for this assignment
+    const moduleId = currentModule?.id; // Assuming you have currentModule available
+    
+    // Update progress using updateModuleProgress for assignment completion
+    await updateModuleProgress(userId, moduleId, 'assignment', {
+      assignmentId: currentLesson.assignmentData.id,
+      content: JSON.stringify(submissionContent),
+      files: assignmentState.files || []
+    });
+    
+    setAssignmentState(prev => ({
+      ...prev,
+      isSubmitted: true
+    }));
+    
+    // Mark lesson as completed (this will handle the animation)
+    await handleLessonComplete(currentLesson.id);
+    alert('Assignment submitted successfully!');
+  } else {
+    alert('Failed to submit assignment. Please try again.');
+  }
+};
+
+  const isAssignmentComplete = () => {
+    if (!currentLesson?.assignmentData?.deliverables) {
+      return assignmentState.submissions['Assignment Response']?.trim();
+    }
+    
+    return currentLesson.assignmentData.deliverables.every(deliverable => 
+      assignmentState.submissions[deliverable]?.trim()
+    );
+  };
+
+  // Review Functions
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    if (!userId) {
+      alert('Please log in to submit a review');
+      return;
+    }
+
+    setReviewForm(prev => ({ ...prev, isSubmitting: true }));
+    
+    const success = await submitReview(
+      userId,
+      course.id,
+      reviewForm.rating,
+      reviewForm.comment
+    );
+    
+    if (success) {
+      setReviewForm({
+        rating: 5,
+        comment: '',
+        isSubmitting: false
+      });
+      alert('Review submitted successfully!');
+    } else {
+      alert('Failed to submit review. Please try again.');
+      setReviewForm(prev => ({ ...prev, isSubmitting: false }));
+    }
+  };
+
+  // Helper Functions
+  const getLessonProgress = (lessonId) => {
+    const lessonProgress = progress[lessonId];
+    if (lessonProgress?.completed) {
+      return 100;
+    }
+    
+    // Check video progress
+    if (videoProgress[lessonId]) {
+      return Math.round(videoProgress[lessonId].progress || 0);
+    }
+    
+    // Check quiz progress
+    if (quizState.isActive && currentLesson?.id === lessonId) {
+      const totalQuestions = currentLesson.quizData?.questions?.length || 1;
+      return Math.round((quizState.currentQuestion / totalQuestions) * 100);
+    }
+
+    // Check assignment progress
+    if (assignmentState.isActive && currentLesson?.id === lessonId) {
+      const totalDeliverables = currentLesson.assignmentData?.deliverables?.length || 1;
+      const completedDeliverables = Object.values(assignmentState.submissions).filter(sub => sub?.trim()).length;
+      return Math.round((completedDeliverables / totalDeliverables) * 100);
+    }
+    
+    return 0;
   };
 
   const getNextLesson = (currentLessonId) => {
@@ -448,7 +612,6 @@ const submitAssignment = () => {
   };
 
   const totalLessons = course.modules.reduce((total, module) => total + module.lessons.length, 0);
-
   const completedLessonsCount = Object.values(progress).filter(lesson => lesson.completed).length;
   const enrollmentDate = isEnrolled ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toLocaleDateString() : null;
 
@@ -1405,7 +1568,7 @@ const submitAssignment = () => {
             {/* Course Info */}
             <div className="flex-1 p-6 lg:p-8">
               <div className="flex flex-wrap items-center gap-2 mb-4">
-                <span className="bg-emerald-600 text-xs px-2 py-1 rounded-full">{course.category}</span>
+                <span className="bg-emerald-600 text-xs px-2 py-1 rounded-full">{course.category?.name}</span>
                 <span className="bg-blue-600 text-xs px-2 py-1 rounded-full">{course.level}</span>
                 <div className="flex items-center text-yellow-400 text-sm">
                   <span className="mr-1">⭐</span>
@@ -1451,7 +1614,7 @@ const submitAssignment = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="font-semibold text-emerald-400">Enrolled since {enrollmentDate}</div>
-                      <div className="text-sm text-gray-300">{completedLessons}/{totalLessons} lessons completed ({Math.round(completionPercentage)}%)</div>
+                      <div className="text-sm text-gray-300">{completedLessonsCount}/{totalLessons} lessons completed ({Math.round(completionPercentage)}%)</div>
                     </div>
                     <div className="text-right">
                       <div className="w-16 h-16 bg-emerald-600 rounded-full flex items-center justify-center text-lg font-bold">
@@ -1485,12 +1648,7 @@ const submitAssignment = () => {
                     >
                       Enroll Now - ${course.price}
                     </button>
-                    <button 
-                      onClick={handleAddToCart}
-                      className="bg-gray-700 hover:bg-gray-600 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
-                    >
-                      Add to Cart
-                    </button>
+                   
                   </>
                 )}
                 
@@ -1501,13 +1659,7 @@ const submitAssignment = () => {
                   <span className="mr-2">▶️</span>
                   Preview
                 </button>
-                
-                <button 
-                  onClick={handleAddToWishlist}
-                  className="bg-gray-700 hover:bg-gray-600 text-white py-3 px-4 rounded-lg transition-colors"
-                >
-                  ❤️
-                </button>
+
               </div>
             </div>
 

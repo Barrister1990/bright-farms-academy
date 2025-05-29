@@ -41,7 +41,7 @@ const DashboardLayout = ({ children, currentPage = 'Dashboard' }) => {
         <div
           className={`flex items-center justify-between px-4 py-3 text-sm font-medium rounded-lg cursor-pointer transition-colors ${
             item.active 
-              ? 'bg-blue-100 text-blue-700 border-r-2 border-blue-700' 
+              ? 'bg-emerald-100 text-emerald-700 border-r-2 border-emerald-700' 
               : 'text-gray-700 hover:bg-gray-100'
           }`}
           onClick={() => item.submenu && setSubmenuOpen(!submenuOpen)}
@@ -78,10 +78,10 @@ const DashboardLayout = ({ children, currentPage = 'Dashboard' }) => {
       <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}>
         <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
           <div className="flex items-center">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
               <BookOpen className="w-5 h-5 text-white" />
             </div>
-            <span className="ml-2 text-xl font-bold text-gray-900">EduAdmin</span>
+            <span className="ml-2 text-xl font-bold text-gray-900">Bright Farms Admin</span>
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -133,7 +133,7 @@ const DashboardLayout = ({ children, currentPage = 'Dashboard' }) => {
                 <input
                   type="text"
                   placeholder="Search..."
-                  className="block w-64 pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  className="block w-64 pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
               
@@ -151,7 +151,7 @@ const DashboardLayout = ({ children, currentPage = 'Dashboard' }) => {
               <div className="relative">
                 <button
                   onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                  className="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  className="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
                 >
                   <img
                     className="h-8 w-8 rounded-full"

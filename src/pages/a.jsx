@@ -1,1478 +1,523 @@
-import {
-  AlertCircle,
-  BookOpen,
-  CheckCircle,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  DollarSign,
-  Eye,
-  FileText,
-  Link,
-  Plus,
-  Save,
-  Settings,
-  Trash2,
-  Upload,
-  Users,
-  Video
-} from 'lucide-react';
-import { useRef, useState } from 'react';
-import DashboardLayout from '../components/layout/DashboardLayout';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowLeft, CheckCircle, Eye, EyeOff, Lock, Mail, Sprout, User, UserCheck } from 'lucide-react';
+import { useState } from 'react';
 
-const AdminAddCourse = () => {
-  const [activeTab, setActiveTab] = useState('basic');
-  const [currentStep, setCurrentStep] = useState(1);
-  const [quizzes, setQuizzes] = useState([]);
-const [assignments, setAssignments] = useState([]);
-    // Touch/swipe handling
-  const touchStartX = useRef(0);
-  const touchEndX = useRef(0);
-  const tabsContainerRef = useRef(null);
-  const [isDragging, setIsDragging] = useState(false);
-  // Course basic information
-  const [courseData, setCourseData] = useState({
-    title: '',
-    slug: '',
-    description: '',
-    shortDescription: '',
-    image: '',
-    categoryId: '',
-    subcategory: '',
-    level: 'Beginner',
-    language: 'English',
-    price: '',
-    originalPrice: '',
-    requirements: [''],
-    whatYouWillLearn: [''],
-    targetAudience: [''],
-    featured: false,
-    bestseller: false
+const AuthPage = () => {
+  const [currentMode, setCurrentMode] = useState('login');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
+  const [confirmationMessage, setConfirmationMessage] = useState('');
+  
+  // Form states
+  const [loginData, setLoginData] = useState({
+    email: '',
+    password: ''
+  });
+  
+  const [registerData, setRegisterData] = useState({
+    username: '',
+    fullName: '',
+    email: '',
+    password: ''
   });
 
-  // Instructor information
-  const [instructorData, setInstructorData] = useState({
-    name: '',
-    title: '',
-    bio: '',
-    avatar: ''
-  });
-
-  // Modules and lessons
-  const [modules, setModules] = useState([{
-    id: 1,
-    title: '',
-    duration: '',
-    lessons: [{
-      id: 1,
-      title: '',
-      duration: '',
-      type: 'video',
-      preview: false,
-      videoUrl: '',
-      videoFile: null,
-      resources: ['']
-    }]
-  }]);
-  // Quiz Management Functions
-const addQuiz = () => {
-  const newQuiz = {
-    id: quizzes.length + 1,
-    title: '',
-    description: '',
-    timeLimit: 10,
-    passingScore: 70,
-    questions: []
-  };
-  setQuizzes([...quizzes, newQuiz]);
-};
-const updateQuiz = (quizIndex, field, value) => {
-  const updatedQuizzes = [...quizzes];
-  updatedQuizzes[quizIndex][field] = value;
-  setQuizzes(updatedQuizzes);
-};
-
-const addQuestion = (quizIndex) => {
-  const updatedQuizzes = [...quizzes];
-  const newQuestion = {
-    id: updatedQuizzes[quizIndex].questions.length + 1,
-    type: 'multiple-choice',
-    question: '',
-    options: ['', '', '', ''],
-    correctAnswer: 0,
-    correctAnswers: [], // for multiple-select
-    explanation: ''
-  };
-  updatedQuizzes[quizIndex].questions.push(newQuestion);
-  setQuizzes(updatedQuizzes);
-};
-
-const updateQuestion = (quizIndex, questionIndex, field, value) => {
-  const updatedQuizzes = [...quizzes];
-  updatedQuizzes[quizIndex].questions[questionIndex][field] = value;
-  setQuizzes(updatedQuizzes);
-};
-
-const updateQuestionOption = (quizIndex, questionIndex, optionIndex, value) => {
-  const updatedQuizzes = [...quizzes];
-  updatedQuizzes[quizIndex].questions[questionIndex].options[optionIndex] = value;
-  setQuizzes(updatedQuizzes);
-};
-
-const addQuestionOption = (quizIndex, questionIndex) => {
-  const updatedQuizzes = [...quizzes];
-  updatedQuizzes[quizIndex].questions[questionIndex].options.push('');
-  setQuizzes(updatedQuizzes);
-};
-
-const removeQuestionOption = (quizIndex, questionIndex, optionIndex) => {
-  const updatedQuizzes = [...quizzes];
-  updatedQuizzes[quizIndex].questions[questionIndex].options.splice(optionIndex, 1);
-  setQuizzes(updatedQuizzes);
-};
-
-// Assignment Management Functions
-const addAssignment = () => {
-  const newAssignment = {
-    id: assignments.length + 1,
-    title: '',
-    description: '',
-    estimatedTime: '',
-    instructions: [''],
-    deliverables: [''],
-    resources: [''],
-    rubric: {},
-    submissionFormat: '',
-    tips: ['']
-  };
-  setAssignments([...assignments, newAssignment]);
-};
-
-const updateAssignment = (assignmentIndex, field, value) => {
-  const updatedAssignments = [...assignments];
-  updatedAssignments[assignmentIndex][field] = value;
-  setAssignments(updatedAssignments);
-};
-
-const updateAssignmentArray = (assignmentIndex, field, index, value) => {
-  const updatedAssignments = [...assignments];
-  updatedAssignments[assignmentIndex][field][index] = value;
-  setAssignments(updatedAssignments);
-};
-
-const addAssignmentArrayItem = (assignmentIndex, field) => {
-  const updatedAssignments = [...assignments];
-  updatedAssignments[assignmentIndex][field].push('');
-  setAssignments(updatedAssignments);
-};
-
-const removeAssignmentArrayItem = (assignmentIndex, field, index) => {
-  const updatedAssignments = [...assignments];
-  updatedAssignments[assignmentIndex][field].splice(index, 1);
-  setAssignments(updatedAssignments);
-};
-
-  // Video upload preference
-  const [videoUploadType, setVideoUploadType] = useState('url'); // 'url' or 'upload'
-
-  const tabs = [
-    { id: 'basic', label: 'Basic Info', icon: BookOpen, steps: 3 },
-    { id: 'instructor', label: 'Instructor', icon: Users, steps: 2 },
-    { id: 'modules', label: 'Modules & Lessons', icon: Video, steps: 4 },
-    { id: 'quizzes', label: 'Quizzes & Tests', icon: FileText, steps: 2 },
-    { id: 'settings', label: 'Settings', icon: Settings, steps: 2 }
-  ];
-
-  const currentTabData = tabs.find(tab => tab.id === activeTab);
-  const totalSteps = currentTabData?.steps || 1;
-
-  const handleInputChange = (field, value) => {
-    setCourseData(prev => ({ ...prev, [field]: value }));
+  // Handle tab switching
+  const handleModeSwitch = (newMode) => {
+    setCurrentMode(newMode);
+    setError('');
+    setShowConfirmation(false);
   };
 
-  const handleArrayInputChange = (field, index, value) => {
-    setCourseData(prev => ({
-      ...prev,
-      [field]: prev[field].map((item, i) => i === index ? value : item)
-    }));
+  // Handle back to login from confirmation screen
+  const handleBackToLogin = () => {
+    setShowConfirmation(false);
+    setCurrentMode('login');
   };
 
-  const addArrayItem = (field) => {
-    setCourseData(prev => ({
-      ...prev,
-      [field]: [...prev[field], '']
-    }));
+  const handleLoginSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    
+    // Simulate API call
+    setTimeout(() => {
+      setLoading(false);
+      // For demo, show email confirmation
+      setUserEmail(loginData.email);
+      setConfirmationMessage('Your email address is not verified yet. We\'ve sent you a new confirmation email.');
+      setShowConfirmation(true);
+    }, 2000);
   };
 
-  const removeArrayItem = (field, index) => {
-    setCourseData(prev => ({
-      ...prev,
-      [field]: prev[field].filter((_, i) => i !== index)
-    }));
+  const handleRegisterSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    
+    // Simulate API call
+    setTimeout(() => {
+      setLoading(false);
+      setUserEmail(registerData.email);
+      setConfirmationMessage('Account created successfully! Please check your email to verify your account.');
+      setShowConfirmation(true);
+    }, 2000);
   };
 
-  const addModule = () => {
-    const newModule = {
-      id: modules.length + 1,
-      title: '',
-      duration: '',
-      lessons: [{
-        id: 1,
-        title: '',
-        duration: '',
-        type: 'video',
-        preview: false,
-        videoUrl: '',
-        videoFile: null,
-        resources: ['']
-      }]
-    };
-    setModules([...modules, newModule]);
-  };
-
-  const addLesson = (moduleIndex) => {
-    const updatedModules = [...modules];
-    const newLesson = {
-      id: updatedModules[moduleIndex].lessons.length + 1,
-      title: '',
-      duration: '',
-      type: 'video',
-      preview: false,
-      videoUrl: '',
-      videoFile: null,
-      resources: ['']
-    };
-    updatedModules[moduleIndex].lessons.push(newLesson);
-    setModules(updatedModules);
-  };
-
-  const updateModule = (moduleIndex, field, value) => {
-    const updatedModules = [...modules];
-    updatedModules[moduleIndex][field] = value;
-    setModules(updatedModules);
-  };
-
-  const updateLesson = (moduleIndex, lessonIndex, field, value) => {
-    const updatedModules = [...modules];
-    updatedModules[moduleIndex].lessons[lessonIndex][field] = value;
-    setModules(updatedModules);
-  };
-
-  const handleVideoUpload = (moduleIndex, lessonIndex, file) => {
-    const updatedModules = [...modules];
-    updatedModules[moduleIndex].lessons[lessonIndex].videoFile = file;
-    updatedModules[moduleIndex].lessons[lessonIndex].videoUrl = URL.createObjectURL(file);
-    setModules(updatedModules);
-  };
-
-  const renderBasicInfoStep = () => {
-    switch (currentStep) {
-      case 1:
-        return (
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Course Details</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Course Title *
-                </label>
-                <input
-                  type="text"
-                  value={courseData.title}
-                  onChange={(e) => handleInputChange('title', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter course title"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Course Slug *
-                </label>
-                <input
-                  type="text"
-                  value={courseData.slug}
-                  onChange={(e) => handleInputChange('slug', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="course-slug-url"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Short Description *
-              </label>
-              <input
-                type="text"
-                value={courseData.shortDescription}
-                onChange={(e) => handleInputChange('shortDescription', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Brief course description"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Full Description *
-              </label>
-              <textarea
-                value={courseData.description}
-                onChange={(e) => handleInputChange('description', e.target.value)}
-                rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Detailed course description"
-              />
-            </div>
-          </div>
-        );
-      
-      case 2:
-        return (
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Course Classification</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Category *
-                </label>
-                <select
-                  value={courseData.categoryId}
-                  onChange={(e) => handleInputChange('categoryId', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Select Category</option>
-                  <option value="1">Agriculture</option>
-                  <option value="2">Technology</option>
-                  <option value="3">Business</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Subcategory *
-                </label>
-                <input
-                  type="text"
-                  value={courseData.subcategory}
-                  onChange={(e) => handleInputChange('subcategory', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., Vegetable Farming"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Level *
-                </label>
-                <select
-                  value={courseData.level}
-                  onChange={(e) => handleInputChange('level', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="Beginner">Beginner</option>
-                  <option value="Intermediate">Intermediate</option>
-                  <option value="Advanced">Advanced</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Language *
-                </label>
-                <select
-                  value={courseData.language}
-                  onChange={(e) => handleInputChange('language', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="English">English</option>
-                  <option value="Spanish">Spanish</option>
-                  <option value="French">French</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Course Image URL
-                </label>
-                <input
-                  type="url"
-                  value={courseData.image}
-                  onChange={(e) => handleInputChange('image', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="https://example.com/image.jpg"
-                />
-              </div>
-            </div>
-          </div>
-        );
-      
-      case 3:
-        return (
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Pricing & Features</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Current Price *
-                </label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                  <input
-                    type="number"
-                    value={courseData.price}
-                    onChange={(e) => handleInputChange('price', e.target.value)}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="89"
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Original Price
-                </label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                  <input
-                    type="number"
-                    value={courseData.originalPrice}
-                    onChange={(e) => handleInputChange('originalPrice', e.target.value)}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="149"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex space-x-6">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={courseData.featured}
-                  onChange={(e) => handleInputChange('featured', e.target.checked)}
-                  className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <span className="text-sm text-gray-700">Featured Course</span>
-              </label>
-              
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={courseData.bestseller}
-                  onChange={(e) => handleInputChange('bestseller', e.target.checked)}
-                  className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <span className="text-sm text-gray-700">Bestseller</span>
-              </label>
-            </div>
-          </div>
-        );
-      
-      default:
-        return null;
+  const tabVariants = {
+    inactive: {
+      backgroundColor: 'transparent',
+      color: '#6B7280'
+    },
+    active: {
+      backgroundColor: '#10B981',
+      color: '#FFFFFF'
     }
   };
 
-  const renderInstructorStep = () => {
-    switch (currentStep) {
-      case 1:
-        return (
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Instructor Information</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Instructor Name *
-                </label>
-                <input
-                  type="text"
-                  value={instructorData.name}
-                  onChange={(e) => setInstructorData(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Dr. Sarah Johnson"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Professional Title *
-                </label>
-                <input
-                  type="text"
-                  value={instructorData.title}
-                  onChange={(e) => setInstructorData(prev => ({ ...prev, title: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Agricultural Scientist & Extension Expert"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Avatar URL
-              </label>
-              <input
-                type="url"
-                value={instructorData.avatar}
-                onChange={(e) => setInstructorData(prev => ({ ...prev, avatar: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="https://example.com/avatar.jpg"
-              />
-            </div>
-          </div>
-        );
-      
-      case 2:
-        return (
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Instructor Bio</h3>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Biography *
-              </label>
-              <textarea
-                value={instructorData.bio}
-                onChange={(e) => setInstructorData(prev => ({ ...prev, bio: e.target.value }))}
-                rows={6}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Dr. Johnson has 15+ years of experience in crop science and has helped over 10,000 farmers increase their yields."
-              />
-            </div>
-          </div>
-        );
-      
-      default:
-        return null;
+  const formVariants = {
+    hidden: { 
+      opacity: 0, 
+      x: currentMode === 'login' ? -50 : 50,
+      scale: 0.95
+    },
+    visible: { 
+      opacity: 1, 
+      x: 0,
+      scale: 1,
+      transition: {
+        duration: 0.4,
+        ease: "easeOut"
+      }
+    },
+    exit: { 
+      opacity: 0, 
+      x: currentMode === 'login' ? 50 : -50,
+      scale: 0.95,
+      transition: {
+        duration: 0.3
+      }
     }
   };
 
-  const renderModulesStep = () => {
-    switch (currentStep) {
-      case 1:
-        return (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-gray-900">Course Modules</h3>
-              <button
-                onClick={addModule}
-                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Module
-              </button>
-            </div>
-            
-            {modules.map((module, moduleIndex) => (
-              <div key={module.id} className="border border-gray-200 rounded-lg p-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Module Title *
-                    </label>
-                    <input
-                      type="text"
-                      value={module.title}
-                      onChange={(e) => updateModule(moduleIndex, 'title', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Introduction to Modern Crop Management"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Duration *
-                    </label>
-                    <input
-                      type="text"
-                      value={module.duration}
-                      onChange={(e) => updateModule(moduleIndex, 'duration', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="45 min"
-                    />
-                  </div>
-                </div>
-                
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="font-medium text-gray-800">Lessons</h4>
-                  <button
-                    onClick={() => addLesson(moduleIndex)}
-                    className="flex items-center px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Add Lesson
-                  </button>
-                </div>
-                
-                {module.lessons.map((lesson, lessonIndex) => (
-                  <div key={lesson.id} className="bg-gray-50 rounded-lg p-3 mb-2">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Lesson Title
-                        </label>
-                        <input
-                          type="text"
-                          value={lesson.title}
-                          onChange={(e) => updateLesson(moduleIndex, lessonIndex, 'title', e.target.value)}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                          placeholder="Course Overview"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Duration
-                        </label>
-                        <input
-                          type="text"
-                          value={lesson.duration}
-                          onChange={(e) => updateLesson(moduleIndex, lessonIndex, 'duration', e.target.value)}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                          placeholder="8 min"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Type
-                        </label>
-                        <select
-                          value={lesson.type}
-                          onChange={(e) => updateLesson(moduleIndex, lessonIndex, 'type', e.target.value)}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                        >
-                          <option value="video">Video</option>
-                          <option value="quiz">Quiz</option>
-                          <option value="assignment">Assignment</option>
-                          <option value="reading">Reading</option>
-                        </select>
-                      </div>
-                    </div>
-                    
-                    {lesson.type === 'video' && (
-                      <div className="space-y-3">
-                        <div className="flex space-x-4">
-                          <label className="flex items-center">
-                            <input
-                              type="radio"
-                              name={`video-type-${moduleIndex}-${lessonIndex}`}
-                              value="url"
-                              checked={videoUploadType === 'url'}
-                              onChange={(e) => setVideoUploadType(e.target.value)}
-                              className="mr-2"
-                            />
-                            <Link className="h-4 w-4 mr-1" />
-                            Video URL
-                          </label>
-                          <label className="flex items-center">
-                            <input
-                              type="radio"
-                              name={`video-type-${moduleIndex}-${lessonIndex}`}
-                              value="upload"
-                              checked={videoUploadType === 'upload'}
-                              onChange={(e) => setVideoUploadType(e.target.value)}
-                              className="mr-2"
-                            />
-                            <Upload className="h-4 w-4 mr-1" />
-                            Upload Video
-                          </label>
-                        </div>
-                        
-                        {videoUploadType === 'url' ? (
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                              Video URL
-                            </label>
-                            <input
-                              type="url"
-                              value={lesson.videoUrl}
-                              onChange={(e) => updateLesson(moduleIndex, lessonIndex, 'videoUrl', e.target.value)}
-                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                              placeholder="https://example.com/video.mp4"
-                            />
-                          </div>
-                        ) : (
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                              Upload Video File
-                            </label>
-                            <input
-                              type="file"
-                              accept="video/*"
-                              onChange={(e) => handleVideoUpload(moduleIndex, lessonIndex, e.target.files[0])}
-                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                            />
-                            {lesson.videoFile && (
-                              <p className="text-xs text-green-600 mt-1">
-                                File uploaded: {lesson.videoFile.name}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                        
-                        <label className="flex items-center text-sm">
-                          <input
-                            type="checkbox"
-                            checked={lesson.preview}
-                            onChange={(e) => updateLesson(moduleIndex, lessonIndex, 'preview', e.target.checked)}
-                            className="mr-2 h-3 w-3"
-                          />
-                          <Eye className="h-3 w-3 mr-1" />
-                          Free Preview
-                        </label>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        );
-      
-      default:
-        return (
-          <div className="text-center py-8">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Step {currentStep} Content
-            </h3>
-            <p className="text-gray-600">
-              Additional module configuration steps would go here.
-            </p>
-          </div>
-        );
+  const confirmationVariants = {
+    hidden: { 
+      opacity: 0, 
+      scale: 0.9,
+      y: 20
+    },
+    visible: { 
+      opacity: 1, 
+      scale: 1,
+      y: 0,
+      transition: {
+        duration: 0.5,
+        ease: "easeOut"
+      }
     }
   };
 
-  const renderQuizzesStep = () => {
-  switch (currentStep) {
-    case 1:
-      return (
-        <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-gray-900">Course Quizzes</h3>
-            <button
-              onClick={addQuiz}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Quiz
-            </button>
-          </div>
-          
-          {quizzes.length === 0 ? (
-            <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
-              <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h4 className="text-lg font-medium text-gray-900 mb-2">No Quizzes Yet</h4>
-              <p className="text-gray-600 mb-4">Add your first quiz to test student knowledge</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {quizzes.map((quiz, quizIndex) => (
-                <div key={quiz.id} className="border border-gray-200 rounded-lg p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Quiz Title *
-                      </label>
-                      <input
-                        type="text"
-                        value={quiz.title}
-                        onChange={(e) => updateQuiz(quizIndex, 'title', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Knowledge Check: Agriculture Basics"
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Time Limit (min)
-                        </label>
-                        <input
-                          type="number"
-                          value={quiz.timeLimit}
-                          onChange={(e) => updateQuiz(quizIndex, 'timeLimit', parseInt(e.target.value))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="10"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Passing Score (%)
-                        </label>
-                        <input
-                          type="number"
-                          value={quiz.passingScore}
-                          onChange={(e) => updateQuiz(quizIndex, 'passingScore', parseInt(e.target.value))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="70"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Description
-                    </label>
-                    <textarea
-                      value={quiz.description}
-                      onChange={(e) => updateQuiz(quizIndex, 'description', e.target.value)}
-                      rows={2}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Test your understanding of fundamental agricultural concepts"
-                    />
-                  </div>
-
-                  <div className="flex justify-between items-center mb-3">
-                    <h4 className="font-medium text-gray-800">Questions ({quiz.questions.length})</h4>
-                    <button
-                      onClick={() => addQuestion(quizIndex)}
-                      className="flex items-center px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      Add Question
-                    </button>
-                  </div>
-
-                  {quiz.questions.map((question, questionIndex) => (
-                    <div key={question.id} className="bg-gray-50 rounded-lg p-4 mb-3">
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
-                        <div className="md:col-span-2">
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Question
-                          </label>
-                          <input
-                            type="text"
-                            value={question.question}
-                            onChange={(e) => updateQuestion(quizIndex, questionIndex, 'question', e.target.value)}
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                            placeholder="What is the primary goal of modern crop management?"
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Type
-                          </label>
-                          <select
-                            value={question.type}
-                            onChange={(e) => updateQuestion(quizIndex, questionIndex, 'type', e.target.value)}
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                          >
-                            <option value="multiple-choice">Multiple Choice</option>
-                            <option value="true-false">True/False</option>
-                            <option value="multiple-select">Multiple Select</option>
-                          </select>
-                        </div>
-
-                        {question.type === 'multiple-choice' && (
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                              Correct Answer
-                            </label>
-                            <select
-                              value={question.correctAnswer}
-                              onChange={(e) => updateQuestion(quizIndex, questionIndex, 'correctAnswer', parseInt(e.target.value))}
-                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                            >
-                              {question.options.map((_, optIndex) => (
-                                <option key={optIndex} value={optIndex}>Option {optIndex + 1}</option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-
-                        {question.type === 'true-false' && (
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                              Correct Answer
-                            </label>
-                            <select
-                              value={question.correctAnswer}
-                              onChange={(e) => updateQuestion(quizIndex, questionIndex, 'correctAnswer', parseInt(e.target.value))}
-                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                            >
-                              <option value={0}>True</option>
-                              <option value={1}>False</option>
-                            </select>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="mb-3">
-                        <div className="flex justify-between items-center mb-2">
-                          <label className="block text-xs font-medium text-gray-600">
-                            Options
-                          </label>
-                          {question.type !== 'true-false' && (
-                            <button
-                              onClick={() => addQuestionOption(quizIndex, questionIndex)}
-                              className="text-xs text-blue-600 hover:text-blue-700"
-                            >
-                              + Add Option
-                            </button>
-                          )}
-                        </div>
-                        
-                        {question.type === 'true-false' ? (
-                          <div className="grid grid-cols-2 gap-2">
-                            <input
-                              type="text"
-                              value="True"
-                              disabled
-                              className="px-2 py-1 text-sm border border-gray-300 rounded bg-gray-100"
-                            />
-                            <input
-                              type="text"
-                              value="False"
-                              disabled
-                              className="px-2 py-1 text-sm border border-gray-300 rounded bg-gray-100"
-                            />
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            {question.options.map((option, optionIndex) => (
-                              <div key={optionIndex} className="flex items-center space-x-2">
-                                {question.type === 'multiple-select' && (
-                                  <input
-                                    type="checkbox"
-                                    checked={question.correctAnswers?.includes(optionIndex) || false}
-                                    onChange={(e) => {
-                                      const correctAnswers = question.correctAnswers || [];
-                                      const newCorrectAnswers = e.target.checked
-                                        ? [...correctAnswers, optionIndex]
-                                        : correctAnswers.filter(idx => idx !== optionIndex);
-                                      updateQuestion(quizIndex, questionIndex, 'correctAnswers', newCorrectAnswers);
-                                    }}
-                                    className="h-3 w-3"
-                                  />
-                                )}
-                                <input
-                                  type="text"
-                                  value={option}
-                                  onChange={(e) => updateQuestionOption(quizIndex, questionIndex, optionIndex, e.target.value)}
-                                  className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                                  placeholder={`Option ${optionIndex + 1}`}
-                                />
-                                {question.options.length > 2 && question.type !== 'true-false' && (
-                                  <button
-                                    onClick={() => removeQuestionOption(quizIndex, questionIndex, optionIndex)}
-                                    className="p-1 text-red-600 hover:bg-red-50 rounded"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Explanation
-                        </label>
-                        <textarea
-                          value={question.explanation}
-                          onChange={(e) => updateQuestion(quizIndex, questionIndex, 'explanation', e.target.value)}
-                          rows={2}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                          placeholder="Explain why this is the correct answer..."
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      );
-
-    case 2:
-      return (
-        <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-gray-900">Course Assignments</h3>
-            <button
-              onClick={addAssignment}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Assignment
-            </button>
-          </div>
-          
-          {assignments.length === 0 ? (
-            <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
-              <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h4 className="text-lg font-medium text-gray-900 mb-2">No Assignments Yet</h4>
-              <p className="text-gray-600 mb-4">Add practical assignments for hands-on learning</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {assignments.map((assignment, assignmentIndex) => (
-                <div key={assignment.id} className="border border-gray-200 rounded-lg p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Assignment Title *
-                      </label>
-                      <input
-                        type="text"
-                        value={assignment.title}
-                        onChange={(e) => updateAssignment(assignmentIndex, 'title', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Create Your Soil Preparation Plan"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Estimated Time
-                      </label>
-                      <input
-                        type="text"
-                        value={assignment.estimatedTime}
-                        onChange={(e) => updateAssignment(assignmentIndex, 'estimatedTime', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="15-20 minutes"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Description
-                    </label>
-                    <textarea
-                      value={assignment.description}
-                      onChange={(e) => updateAssignment(assignmentIndex, 'description', e.target.value)}
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Develop a comprehensive soil preparation plan for a specific crop of your choice."
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Instructions */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Instructions
-                      </label>
-                      {assignment.instructions.map((instruction, index) => (
-                        <div key={index} className="flex items-center space-x-2 mb-2">
-                          <input
-                            type="text"
-                            value={instruction}
-                            onChange={(e) => updateAssignmentArray(assignmentIndex, 'instructions', index, e.target.value)}
-                            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500"
-                            placeholder="Choose a crop you want to grow"
-                          />
-                          <button
-                            onClick={() => removeAssignmentArrayItem(assignmentIndex, 'instructions', index)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                      <button
-                        onClick={() => addAssignmentArrayItem(assignmentIndex, 'instructions')}
-                        className="flex items-center text-sm text-blue-600 hover:text-blue-700"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Instruction
-                      </button>
-                    </div>
-
-                    {/* Deliverables */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Deliverables
-                      </label>
-                      {assignment.deliverables.map((deliverable, index) => (
-                        <div key={index} className="flex items-center space-x-2 mb-2">
-                          <input
-                            type="text"
-                            value={deliverable}
-                            onChange={(e) => updateAssignmentArray(assignmentIndex, 'deliverables', index, e.target.value)}
-                            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500"
-                            placeholder="Completed soil preparation checklist"
-                          />
-                          <button
-                            onClick={() => removeAssignmentArrayItem(assignmentIndex, 'deliverables', index)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                      <button
-                        onClick={() => addAssignmentArrayItem(assignmentIndex, 'deliverables')}
-                        className="flex items-center text-sm text-blue-600 hover:text-blue-700"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Deliverable
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                    {/* Resources */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Resources
-                      </label>
-                      {assignment.resources.map((resource, index) => (
-                        <div key={index} className="flex items-center space-x-2 mb-2">
-                          <input
-                            type="text"
-                            value={resource}
-                            onChange={(e) => updateAssignmentArray(assignmentIndex, 'resources', index, e.target.value)}
-                            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500"
-                            placeholder="Soil preparation template (downloadable PDF)"
-                          />
-                          <button
-                            onClick={() => removeAssignmentArrayItem(assignmentIndex, 'resources', index)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                      <button
-                        onClick={() => addAssignmentArrayItem(assignmentIndex, 'resources')}
-                        className="flex items-center text-sm text-blue-600 hover:text-blue-700"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Resource
-                      </button>
-                    </div>
-
-                    {/* Tips */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Tips
-                      </label>
-                      {assignment.tips.map((tip, index) => (
-                        <div key={index} className="flex items-center space-x-2 mb-2">
-                          <input
-                            type="text"
-                            value={tip}
-                            onChange={(e) => updateAssignmentArray(assignmentIndex, 'tips', index, e.target.value)}
-                            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500"
-                            placeholder="Consider your local climate and growing season"
-                          />
-                          <button
-                            onClick={() => removeAssignmentArrayItem(assignmentIndex, 'tips', index)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                      <button
-                        onClick={() => addAssignmentArrayItem(assignmentIndex, 'tips')}
-                        className="flex items-center text-sm text-blue-600 hover:text-blue-700"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Tip
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Submission Format
-                    </label>
-                    <input
-                      type="text"
-                      value={assignment.submissionFormat}
-                      onChange={(e) => updateAssignment(assignmentIndex, 'submissionFormat', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Upload completed worksheets as PDF or submit online form"
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      );
-
-    default:
-      return null;
-  }
-};
-
-  const renderCurrentTabContent = () => {
-    switch (activeTab) {
-      case 'basic':
-        return renderBasicInfoStep();
-      case 'instructor':
-        return renderInstructorStep();
-      case 'modules':
-        return renderModulesStep();
-      case 'quizzes':
-  return renderQuizzesStep();
-      case 'settings':
-        return (
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Course Requirements & Outcomes</h3>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Requirements
-              </label>
-              {courseData.requirements.map((req, index) => (
-                <div key={index} className="flex items-center space-x-2 mb-2">
-                  <input
-                    type="text"
-                    value={req}
-                    onChange={(e) => handleArrayInputChange('requirements', index, e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Basic understanding of farming principles"
-                  />
-                  <button
-                    onClick={() => removeArrayItem('requirements', index)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-              <button
-                onClick={() => addArrayItem('requirements')}
-                className="flex items-center text-sm text-blue-600 hover:text-blue-700"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add Requirement
-              </button>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                What You Will Learn
-              </label>
-              {courseData.whatYouWillLearn.map((item, index) => (
-                <div key={index} className="flex items-center space-x-2 mb-2">
-                  <input
-                    type="text"
-                    value={item}
-                    onChange={(e) => handleArrayInputChange('whatYouWillLearn', index, e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Advanced crop rotation strategies"
-                  />
-                  <button
-                    onClick={() => removeArrayItem('whatYouWillLearn', index)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-              <button
-                onClick={() => addArrayItem('whatYouWillLearn')}
-                className="flex items-center text-sm text-blue-600 hover:text-blue-700"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add Learning Outcome
-              </button>
-            </div>
-          </div>
-        );
-      default:
-        return null;
+  const inputVariants = {
+    focus: {
+      scale: 1.02,
+      transition: { duration: 0.2 }
     }
-  };
-
-  const nextStep = () => {
-    if (currentStep < totalSteps) {
-      setCurrentStep(currentStep + 1);
-    }
-  };
-
-  const prevStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const handleTabChange = (tabId) => {
-    setActiveTab(tabId);
-    setCurrentStep(1);
-  };
-
-  const handleSave = () => {
-    // Here you would typically save the course data
-    console.log('Saving course data:', {
-       courseData,
-  instructorData,
-  modules,
-  quizzes,
-  assignments
-    });
-    alert('Course saved successfully! (This is a demo)');
   };
 
   return (
-     <DashboardLayout currentPage="Courses">
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto py-6 px-4">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Add New Course</h1>
-          <p className="text-gray-600 mt-2">Create and manage your course content with our step-by-step builder.</p>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="bg-white rounded-lg shadow-sm mb-6">
-          <div className="border-b border-gray-200">
-            <nav className="flex space-x-8 px-6">
-              {tabs.map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => handleTabChange(tab.id)}
-                    className={`flex items-center py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
-                      isActive
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    <Icon className="h-5 w-5 mr-2" />
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="px-6 py-4 bg-gray-50">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">
-                Step {currentStep} of {totalSteps}
-              </span>
-              <span className="text-sm text-gray-500">
-                {Math.round((currentStep / totalSteps) * 100)}% Complete
-              </span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${(currentStep / totalSteps) * 100}%` }}
-              ></div>
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 flex items-center justify-center p-2 sm:p-4">
+      <div className="w-full max-w-xs sm:max-w-md">
+        {/* Branding */}
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-4 sm:mb-8"
+        >
+          <div className="flex items-center justify-center space-x-1 sm:space-x-2 mb-2 sm:mb-4">
+            <div className="bg-gradient-to-r from-green-400 to-green-500 p-1.5 sm:p-3 rounded-lg sm:rounded-xl shadow-lg">
+              <Sprout className="h-4 w-4 sm:h-8 sm:w-8 text-white" />
             </div>
           </div>
-        </div>
+          <h1 className="text-lg sm:text-2xl font-bold text-gray-800 hover:text-green-600 transition-colors duration-200">
+            Bright Farm Academy
+          </h1>
+          <p className="text-xs sm:text-base text-gray-600 mt-1 sm:mt-2 px-2">
+            {showConfirmation ? 'Email Verification Required' : 'Welcome back to your learning journey'}
+          </p>
+        </motion.div>
 
-        {/* Main Content */}
-        <div className="bg-white rounded-lg shadow-sm">
-          <div className="p-6">
-            {renderCurrentTabContent()}
-          </div>
-
-          {/* Navigation Buttons */}
-          <div className="flex justify-between items-center px-6 py-4 bg-gray-50 border-t border-gray-200">
-            <button
-              onClick={prevStep}
-              disabled={currentStep === 1}
-              className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
-                currentStep === 1
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              Previous
-            </button>
-
-            <div className="flex space-x-3">
-              <button
-                onClick={handleSave}
-                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+        {/* Auth Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="bg-white rounded-xl sm:rounded-2xl shadow-xl border border-gray-100 overflow-hidden"
+        >
+          <AnimatePresence mode="wait">
+            {showConfirmation ? (
+              // Email Confirmation Screen
+              <motion.div
+                key="confirmation"
+                variants={confirmationVariants}
+                initial="hidden"
+                animate="visible"
+                className="p-4 sm:p-8 text-center"
               >
-                <Save className="h-4 w-4 mr-2" />
-                Save Draft
-              </button>
-
-              {currentStep < totalSteps ? (
-                <button
-                  onClick={nextStep}
-                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                {/* Success Icon */}
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                  className="flex justify-center mb-3 sm:mb-6"
                 >
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-2" />
-                </button>
-              ) : (
-                <button
-                  onClick={handleSave}
-                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  <div className="bg-green-100 p-2 sm:p-4 rounded-full">
+                    <CheckCircle className="h-8 w-8 sm:h-16 sm:w-16 text-green-500" />
+                  </div>
+                </motion.div>
+
+                {/* Success Message */}
+                <motion.h2
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="text-lg sm:text-2xl font-bold text-gray-800 mb-2 sm:mb-4"
                 >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Publish Course
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+                  Check Your Email!
+                </motion.h2>
 
-        {/* Status Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Clock className="h-6 w-6 text-blue-600" />
-              </div>
-              <div className="ml-4">
-                <h4 className="text-lg font-semibold text-gray-900">Draft Status</h4>
-                <p className="text-gray-600">Course in progress</p>
-              </div>
-            </div>
-          </div>
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="space-y-2 sm:space-y-4"
+                >
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4">
+                    <Mail className="h-4 w-4 sm:h-6 sm:w-6 text-green-600 mx-auto mb-1 sm:mb-2" />
+                    <p className="text-gray-700 text-xs sm:text-sm leading-relaxed mb-1 sm:mb-2">
+                      {confirmationMessage}
+                    </p>
+                    <p className="text-gray-700 text-xs sm:text-sm leading-relaxed">
+                      Confirmation email sent to:
+                    </p>
+                    <p className="font-semibold text-green-700 text-xs sm:text-sm mt-1 break-all">
+                      {userEmail}
+                    </p>
+                  </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <AlertCircle className="h-6 w-6 text-yellow-600" />
-              </div>
-              <div className="ml-4">
-                <h4 className="text-lg font-semibold text-gray-900">Validation</h4>
-                <p className="text-gray-600">Pending review</p>
-              </div>
-            </div>
-          </div>
+                  <p className="text-gray-600 text-xs sm:text-sm leading-relaxed px-2">
+                    Please click on the link in your email to verify your account and start enjoying your learning journey with Bright Farm Academy.
+                  </p>
 
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <CheckCircle className="h-6 w-6 text-green-600" />
-              </div>
-              <div className="ml-4">
-                <h4 className="text-lg font-semibold text-gray-900">Auto-save</h4>
-                <p className="text-gray-600">Changes saved</p>
-              </div>
-            </div>
-          </div>
-        </div>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 sm:p-3 mt-2 sm:mt-4">
+                    <p className="text-yellow-800 text-xs">
+                      💡 <strong>Tip:</strong> Check your spam folder if you don't see the email in your inbox.
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Back to Login Button */}
+                <motion.button
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  onClick={handleBackToLogin}
+                  className="mt-4 sm:mt-6 inline-flex items-center space-x-1 sm:space-x-2 text-green-600 hover:text-green-700 font-semibold transition-colors duration-200 text-sm sm:text-base"
+                >
+                  <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span>Back to Login</span>
+                </motion.button>
+              </motion.div>
+            ) : (
+              <>
+                {/* Tab Headers */}
+                <div className="flex bg-gray-50 p-0.5 sm:p-1 m-3 sm:m-6 rounded-lg sm:rounded-xl">
+                  <motion.button
+                    variants={tabVariants}
+                    animate={currentMode === 'login' ? 'active' : 'inactive'}
+                    onClick={() => handleModeSwitch('login')}
+                    className="flex-1 py-2 sm:py-3 px-2 sm:px-4 rounded-md sm:rounded-lg font-semibold transition-all duration-300 flex items-center justify-center space-x-1 sm:space-x-2 text-xs sm:text-base"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    disabled={loading}
+                  >
+                    <Lock className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span>Login</span>
+                  </motion.button>
+                  <motion.button
+                    variants={tabVariants}
+                    animate={currentMode === 'register' ? 'active' : 'inactive'}
+                    onClick={() => handleModeSwitch('register')}
+                    className="flex-1 py-2 sm:py-3 px-2 sm:px-4 rounded-md sm:rounded-lg font-semibold transition-all duration-300 flex items-center justify-center space-x-1 sm:space-x-2 text-xs sm:text-base"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    disabled={loading}
+                  >
+                    <UserCheck className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span>Register</span>
+                  </motion.button>
+                </div>
+
+                {/* Error Message */}
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mx-3 sm:mx-6 mb-2 sm:mb-4 p-2 sm:p-3 bg-red-50 border border-red-200 rounded-lg"
+                  >
+                    <p className="text-red-600 text-xs sm:text-sm">{error}</p>
+                  </motion.div>
+                )}
+
+                {/* Form Content */}
+                <div className="p-3 sm:p-6 pt-0">
+                  <AnimatePresence mode="wait">
+                    {currentMode === 'login' ? (
+                      <motion.form
+                        key="login"
+                        variants={formVariants}
+                        initial="hidden"
+                        animate="visible"
+                        exit="exit"
+                        onSubmit={handleLoginSubmit}
+                        className="space-y-3 sm:space-y-5"
+                      >
+                        <div>
+                          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                            Email Address
+                          </label>
+                          <motion.div 
+                            variants={inputVariants}
+                            whileFocus="focus"
+                            className="relative"
+                          >
+                            <Mail className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-5 sm:w-5 text-gray-400" />
+                            <input
+                              type="email"
+                              value={loginData.email}
+                              onChange={(e) => setLoginData({...loginData, email: e.target.value})}
+                              className="w-full pl-7 sm:pl-10 pr-3 sm:pr-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 text-xs sm:text-base"
+                              placeholder="Enter your email"
+                              required
+                              disabled={loading}
+                            />
+                          </motion.div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                            Password
+                          </label>
+                          <motion.div 
+                            variants={inputVariants}
+                            whileFocus="focus"
+                            className="relative"
+                          >
+                            <Lock className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-5 sm:w-5 text-gray-400" />
+                            <input
+                              type={showPassword ? "text" : "password"}
+                              value={loginData.password}
+                              onChange={(e) => setLoginData({...loginData, password: e.target.value})}
+                              className="w-full pl-7 sm:pl-10 pr-8 sm:pr-12 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 text-xs sm:text-base"
+                              placeholder="Enter your password"
+                              required
+                              disabled={loading}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                              disabled={loading}
+                            >
+                              {showPassword ? <EyeOff className="h-3 w-3 sm:h-5 sm:w-5" /> : <Eye className="h-3 w-3 sm:h-5 sm:w-5" />}
+                            </button>
+                          </motion.div>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <label className="flex items-center">
+                            <input 
+                              type="checkbox" 
+                              className="rounded border-gray-300 text-green-600 shadow-sm focus:border-green-300 focus:ring focus:ring-green-200 focus:ring-opacity-50 h-3 w-3 sm:h-4 sm:w-4"
+                              disabled={loading}
+                            />
+                            <span className="ml-1 sm:ml-2 text-xs sm:text-sm text-gray-600">Remember me</span>
+                          </label>
+                          <a href="#" className="text-xs sm:text-sm text-green-600 hover:text-green-500">
+                            Forgot password?
+                          </a>
+                        </div>
+
+                        <motion.button
+                          type="submit"
+                          whileHover={{ scale: loading ? 1 : 1.02 }}
+                          whileTap={{ scale: loading ? 1 : 0.98 }}
+                          className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-2 sm:py-3 px-3 sm:px-4 rounded-lg font-semibold hover:from-green-600 hover:to-green-700 transition duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-base"
+                          disabled={loading}
+                        >
+                          {loading ? 'Signing In...' : 'Sign In'}
+                        </motion.button>
+                      </motion.form>
+                    ) : (
+                      <motion.form
+                        key="register"
+                        variants={formVariants}
+                        initial="hidden"
+                        animate="visible"
+                        exit="exit"
+                        onSubmit={handleRegisterSubmit}
+                        className="space-y-3 sm:space-y-5"
+                      >
+                        <div>
+                          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                            Username
+                          </label>
+                          <motion.div 
+                            variants={inputVariants}
+                            whileFocus="focus"
+                            className="relative"
+                          >
+                            <User className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-5 sm:w-5 text-gray-400" />
+                            <input
+                              type="text"
+                              value={registerData.username}
+                              onChange={(e) => setRegisterData({...registerData, username: e.target.value})}
+                              className="w-full pl-7 sm:pl-10 pr-3 sm:pr-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 text-xs sm:text-base"
+                              placeholder="Choose a username"
+                              required
+                              disabled={loading}
+                            />
+                          </motion.div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                            Full Name
+                          </label>
+                          <motion.div 
+                            variants={inputVariants}
+                            whileFocus="focus"
+                            className="relative"
+                          >
+                            <UserCheck className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-5 sm:w-5 text-gray-400" />
+                            <input
+                              type="text"
+                              value={registerData.fullName}
+                              onChange={(e) => setRegisterData({...registerData, fullName: e.target.value})}
+                              className="w-full pl-7 sm:pl-10 pr-3 sm:pr-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 text-xs sm:text-base"
+                              placeholder="Enter your full name"
+                              required
+                              disabled={loading}
+                            />
+                          </motion.div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                            Email Address
+                          </label>
+                          <motion.div 
+                            variants={inputVariants}
+                            whileFocus="focus"
+                            className="relative"
+                          >
+                            <Mail className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-5 sm:w-5 text-gray-400" />
+                            <input
+                              type="email"
+                              value={registerData.email}
+                              onChange={(e) => setRegisterData({...registerData, email: e.target.value})}
+                              className="w-full pl-7 sm:pl-10 pr-3 sm:pr-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 text-xs sm:text-base"
+                              placeholder="Enter your email"
+                              required
+                              disabled={loading}
+                            />
+                          </motion.div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                            Password
+                          </label>
+                          <motion.div 
+                            variants={inputVariants}
+                            whileFocus="focus"
+                            className="relative"
+                          >
+                            <Lock className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-5 sm:w-5 text-gray-400" />
+                            <input
+                              type={showPassword ? "text" : "password"}
+                              value={registerData.password}
+                              onChange={(e) => setRegisterData({...registerData, password: e.target.value})}
+                              className="w-full pl-7 sm:pl-10 pr-8 sm:pr-12 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 text-xs sm:text-base"
+                              placeholder="Create a password"
+                              required
+                              disabled={loading}
+                              minLength={6}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                              disabled={loading}
+                            >
+                              {showPassword ? <EyeOff className="h-3 w-3 sm:h-5 sm:w-5" /> : <Eye className="h-3 w-3 sm:h-5 sm:w-5" />}
+                            </button>
+                          </motion.div>
+                        </div>
+
+                        <div className="flex items-start">
+                          <input 
+                            type="checkbox" 
+                            className="rounded border-gray-300 text-green-600 shadow-sm focus:border-green-300 focus:ring focus:ring-green-200 focus:ring-opacity-50 h-3 w-3 sm:h-4 sm:w-4 mt-0.5" 
+                            required 
+                            disabled={loading}
+                          />
+                          <span className="ml-1 sm:ml-2 text-xs sm:text-sm text-gray-600 leading-tight">
+                            I agree to the <a href="#" className="text-green-600 hover:text-green-500">Terms & Conditions</a>
+                          </span>
+                        </div>
+
+                        <motion.button
+                          type="submit"
+                          whileHover={{ scale: loading ? 1 : 1.02 }}
+                          whileTap={{ scale: loading ? 1 : 0.98 }}
+                          className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-2 sm:py-3 px-3 sm:px-4 rounded-lg font-semibold hover:from-green-600 hover:to-green-700 transition duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-base"
+                          disabled={loading}
+                        >
+                          {loading ? 'Creating Account...' : 'Create Account'}
+                        </motion.button>
+                      </motion.form>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </>
+            )}
+          </AnimatePresence>
+        </motion.div>
+
+        {/* Footer */}
+        {!showConfirmation && (
+          <motion.p 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+            className="text-center text-gray-600 mt-3 sm:mt-6 px-2 text-xs sm:text-base"
+          >
+            {currentMode === 'login' ? "Don't have an account? " : "Already have an account? "}
+            <button
+              onClick={() => handleModeSwitch(currentMode === 'login' ? 'register' : 'login')}
+              className="text-green-600 hover:text-green-500 font-semibold"
+              disabled={loading}
+            >
+              {currentMode === 'login' ? 'Sign up' : 'Sign in'}
+            </button>
+          </motion.p>
+        )}
       </div>
     </div>
-    </DashboardLayout>
   );
 };
 
-export default AdminAddCourse;
+export default AuthPage;
