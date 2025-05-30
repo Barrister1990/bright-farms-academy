@@ -179,7 +179,7 @@ const CourseDetailPage = () => {
     return () => clearInterval(timer);
   }, [quizState.isActive, quizState.timeRemaining, quizState.isSubmitted]);
 
-if (loading) {
+if (loading || !course) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-emerald-50 flex items-center justify-center px-4 relative overflow-hidden">
       {/* Animated background elements */}
@@ -815,6 +815,19 @@ const handleAssignmentSubmit = async () => {
   const completionPercentage = totalLessons > 0 
   ? Math.round((completedLessonsCount / totalLessons) * 100) 
   : 0;
+
+function formatDuration(totalMinutes) {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')} hrs`;
+  } else {
+    return `${minutes} mins`;
+  }
+}
+
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Congratulations Toast */}
@@ -851,8 +864,7 @@ const handleAssignmentSubmit = async () => {
           preload="metadata"
           onError={(e) => console.error('Video error:', e)}
         >
-          <source src="https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4" type="video/mp4" />
-          <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4" />
+          <source src="https://giwjevxanyizjwywxhzu.supabase.co/storage/v1/object/public/course-content/videos/Agriculture%20and%20it's%20Importance.mp4" type="video/mp4" />
           Your browser does not support the video tag.
         </video>
         <div className="mt-4 text-sm text-gray-600">
@@ -1058,7 +1070,7 @@ const handleAssignmentSubmit = async () => {
               </div>
             </div>
           ) : currentLesson.type === 'quiz' ? (
-            <div className="h-screen bg-white flex flex-col overflow-hidden">
+            <div className="h-screen bg-white flex flex-col overflow-hidden sm:h-screen">
               {!quizState.isActive ? (
                 // Quiz Start Screen
                 <div className="flex-1 overflow-y-auto">
@@ -1729,8 +1741,8 @@ const handleAssignmentSubmit = async () => {
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 <div className="text-center">
-                  <div className="text-2xl font-bold">{course.duration}</div>
-                  <div className="text-sm text-gray-300">Total hours</div>
+                  <div className="text-2xl font-bold">{formatDuration(course.duration)}</div>
+                  <div className="text-sm text-gray-300">Total duration</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold">{totalLessons}</div>
@@ -1786,7 +1798,7 @@ const handleAssignmentSubmit = async () => {
                       onClick={handleEnroll}
                       className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
                     >
-                      Enroll Now - ${course.price}
+                      Enroll Now - Free
                     </button>
                    
                   </>
@@ -1804,23 +1816,71 @@ const handleAssignmentSubmit = async () => {
             </div>
 
             {/* Course Thumbnail */}
-            <div className="lg:w-80 xl:w-96">
-              <div className="relative h-48 lg:h-full">
-                <img 
-                  src={course.thumbnail} 
-                  alt={course.title}
-                  className="w-full h-full object-cover"
-                />
-                <button 
-                  onClick={() => setShowVideo(true)}
-                  className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 hover:bg-opacity-50 transition-colors group"
-                >
-                  <div className="w-16 h-16 bg-white bg-opacity-90 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <span className="text-2xl text-gray-800 ml-1">▶️</span>
-                  </div>
-                </button>
-              </div>
-            </div>
+         <div className="w-full sm:w-80 lg:w-80 xl:w-96 mx-auto sm:mx-0">
+  <div className="relative h-48 sm:h-56 md:h-64 lg:h-full rounded-lg overflow-hidden shadow-lg group">
+    {/* Course Image */}
+    <img
+      src={course.image}
+      alt={course.title}
+      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+      onError={(e) => {
+        // Fallback image if course image fails to load
+        e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzZiNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkNvdXJzZSBJbWFnZTwvdGV4dD48L3N2Zz4=';
+      }}
+    />
+    
+    {/* Gradient Overlay */}
+    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-70 group-hover:opacity-80 transition-opacity duration-300" />
+    
+    {/* Play Button */}
+    <button
+      onClick={() => setIsVideoModalOpen(true)}
+      className="absolute inset-0 flex items-center justify-center transition-all duration-300 group"
+      aria-label="Play course preview video"
+    >
+      {/* Play Button Background */}
+      <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:scale-110 group-hover:bg-white/95 transition-all duration-300">
+        {/* Play Icon */}
+        <div className="w-0 h-0 border-l-[8px] sm:border-l-[10px] md:border-l-[12px] border-r-0 border-t-[6px] sm:border-t-[7px] md:border-t-[8px] border-b-[6px] sm:border-b-[7px] md:border-b-[8px] border-l-gray-700 border-t-transparent border-b-transparent ml-1" />
+      </div>
+      
+      {/* Hover Text */}
+      <div className="absolute bottom-4 left-4 right-4 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        <p className="text-sm sm:text-base font-medium">Watch Preview</p>
+      </div>
+    </button>
+    
+    {/* Course Badge/Tag (if applicable) */}
+    {course.level && (
+      <div className="absolute top-3 left-3">
+        <span className="px-2 py-1 text-xs font-semibold text-white bg-blue-600/80 backdrop-blur-sm rounded-full">
+          {course.level}
+        </span>
+      </div>
+    )}
+    
+    {/* Duration Badge (if applicable) */}
+    {course.duration && (
+      <div className="absolute top-3 right-3">
+        <span className="px-2 py-1 text-xs font-medium text-white bg-black/60 backdrop-blur-sm rounded-full">
+          {formatDuration(course.duration)}
+        </span>
+      </div>
+    )}
+    
+    {/* Loading State */}
+    <div className="absolute inset-0 bg-gray-200 animate-pulse hidden [&.loading]:block">
+      <div className="w-full h-full bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 animate-pulse" />
+    </div>
+  </div>
+  
+  {/* Image Caption (Optional) */}
+  {course.imageCaption && (
+    <p className="text-xs sm:text-sm text-gray-600 mt-2 text-center px-2">
+      {course.imageCaption}
+    </p>
+  )}
+</div>
           </div>
         </div>
 
@@ -2236,7 +2296,7 @@ const handleAssignmentSubmit = async () => {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Duration</span>
-                  <span className="font-medium">{course.duration}</span>
+                  <span className="font-medium">{formatDuration(course.duration)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Lessons</span>

@@ -1,4 +1,4 @@
-import { LogOut, Menu, Sprout, User, X } from 'lucide-react';
+import { LogOut, Menu, Shield, Sprout, User, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from "react-router-dom";
 import useUserStore from '../../store/userStore';
@@ -9,13 +9,22 @@ const Navbar = () => {
   
   // Zustand store for user authentication
   const { isLoggedIn, user, login, logout } = useUserStore();
-  console.log(user)
+
   
   const navigation = [
     { name: 'Home', href: '/' },
     { name: 'Courses', href: '/courses' },
     { name: 'Dashboard', href: '/dashboard' }
   ];
+
+  // Add admin route conditionally
+  const getNavigationItems = () => {
+    const navItems = [...navigation];
+    if (isLoggedIn && user?.role === 'admin') {
+      navItems.push({ name: 'Admin', href: '/admin' });
+    }
+    return navItems;
+  };
 
   const isActive = (path) => pathname === path;
 
@@ -94,17 +103,20 @@ const Navbar = () => {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-8">
-              {navigation.map((item) => (
+              {getNavigationItems().map((item) => (
                 <Link
                   key={item.name}
                   to={item.href}
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                  className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                     isActive(item.href)
                       ? 'text-green-600 bg-green-50 border-b-2 border-green-500'
                       : 'text-gray-700 hover:text-green-600 hover:bg-green-50'
+                  } ${item.name === 'Admin' ? 'text-blue-600 hover:text-blue-700 hover:bg-blue-50' : ''} ${
+                    isActive(item.href) && item.name === 'Admin' ? 'text-blue-600 bg-blue-50 border-blue-500' : ''
                   }`}
                 >
-                  {item.name}
+                  {item.name === 'Admin' && <Shield className="h-4 w-4" />}
+                  <span>{item.name}</span>
                 </Link>
               ))}
             </div>
@@ -118,6 +130,11 @@ const Navbar = () => {
                     <span className="text-sm font-medium text-green-700">
                       {user?.username}
                     </span>
+                    {user?.role === 'admin' && (
+                      <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">
+                        Admin
+                      </span>
+                    )}
                   </div>
                   <button
                     onClick={handleLogout}
@@ -153,6 +170,9 @@ const Navbar = () => {
                   <span className="text-xs font-medium text-green-700 max-w-16 truncate">
                     {user?.username}
                   </span>
+                  {user?.role === 'admin' && (
+                    <Shield className="h-3 w-3 text-blue-600" />
+                  )}
                 </div>
               ) : (
                 <Link
@@ -198,10 +218,17 @@ const Navbar = () => {
                 <div className="w-8 h-8 bg-green-200 rounded-full flex items-center justify-center">
                   <User className="h-4 w-4 text-green-600" />
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-800">
-                    {user?.username || 'User'}
-                  </p>
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2">
+                    <p className="text-sm font-medium text-gray-800">
+                      {user?.username || 'User'}
+                    </p>
+                    {user?.role === 'admin' && (
+                      <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">
+                        Admin
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-500">
                     {user?.email || 'Welcome back!'}
                   </p>
@@ -213,18 +240,21 @@ const Navbar = () => {
           {/* Navigation Links */}
           <div className="flex-1 py-4">
             <nav className="space-y-1 px-3">
-              {navigation.map((item) => (
+              {getNavigationItems().map((item) => (
                 <Link
                   key={item.name}
                   to={item.href}
                   onClick={handleNavClick}
-                  className={`block px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  className={`flex items-center space-x-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                     isActive(item.href)
                       ? 'text-green-600 bg-green-50 border-l-4 border-green-500'
                       : 'text-gray-700 hover:text-green-600 hover:bg-gray-50'
+                  } ${item.name === 'Admin' ? 'text-blue-600 hover:text-blue-700 hover:bg-blue-50' : ''} ${
+                    isActive(item.href) && item.name === 'Admin' ? 'text-blue-600 bg-blue-50 border-blue-500' : ''
                   }`}
                 >
-                  {item.name}
+                  {item.name === 'Admin' && <Shield className="h-4 w-4" />}
+                  <span>{item.name}</span>
                 </Link>
               ))}
             </nav>

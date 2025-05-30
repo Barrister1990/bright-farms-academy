@@ -163,15 +163,11 @@ const CoursesPage = () => {
                 Best
               </div>
             )}
-            {course.discount > 0 && (
-              <div className="bg-red-500 text-white px-1 py-0.5 rounded text-xs font-semibold">
-                -{course.discount}%
-              </div>
-            )}
+            
           </div>
 
           <div className="absolute top-1 left-1 bg-emerald-500 text-white px-1 py-0.5 rounded text-xs font-semibold">
-            {formatPrice(course.price)}
+            Free
           </div>
         </div>
 
@@ -231,15 +227,11 @@ const CoursesPage = () => {
                         Bestseller
                       </div>
                     )}
-                    {course.discount > 0 && (
-                      <div className="bg-red-500 text-white px-2 py-1 rounded text-xs font-semibold">
-                        {course.discount}% OFF
-                      </div>
-                    )}
+
                   </div>
 
                   <div className="absolute top-3 left-3 bg-emerald-500 text-white px-3 py-1 rounded text-sm font-semibold">
-                    {formatPrice(course.price)}
+                    Free
                   </div>
                 </div>
                 
@@ -282,11 +274,9 @@ const CoursesPage = () => {
                   
                   {course.originalPrice && course.originalPrice > course.price && (
                     <div className="flex items-center mb-4">
-                      <span className="text-gray-400 line-through text-sm mr-2">
-                        ${course.originalPrice}
-                      </span>
+                      
                       <span className="text-emerald-600 font-bold">
-                        ${course.price}
+                        Free
                       </span>
                     </div>
                   )}

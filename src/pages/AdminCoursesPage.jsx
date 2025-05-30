@@ -1,8 +1,8 @@
 import { Calendar, Clock, Edit, Eye, Filter, Search, Star, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import useAdminCourseStore from '../store/adminCourseStore';
-
 const AdminCoursesPage = () => {
   // Get store data and actions
   const {
@@ -42,7 +42,7 @@ const AdminCoursesPage = () => {
   const [localFilterLevel, setLocalFilterLevel] = useState(filters.level);
   const [localSortBy, setLocalSortBy] = useState(`${sortBy}-${sortOrder}`);
   const [showFilters, setShowFilters] = useState(false);
-
+  const navigate = useNavigate();
   // Get paginated courses
   const paginatedData = getPaginatedCourses();
   const dashboardStats = getDashboardStats();
@@ -72,10 +72,9 @@ const AdminCoursesPage = () => {
     setSortOrder(order);
   }, [localSortBy, setSortBy, setSortOrder]);
 
-  const handleEditCourse = (slug) => {
+  const handleEditCourse = (slug, id) => {
     // In a real app, this would use your router (e.g., React Router)
-    console.log(`Navigate to: /admin/course/${slug}`);
-    alert(`Navigating to edit course: ${slug}`);
+    navigate(`/admin/courses/edit/${slug}?cid=${id}`); 
   };
 
   const handleViewCourse = (slug) => {
@@ -473,7 +472,7 @@ const AdminCoursesPage = () => {
                             )}
                             
                             <button
-                              onClick={() => handleEditCourse(course.slug)}
+                              onClick={() => handleEditCourse(course.slug, course.id)}
                               className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-1"
                             >
                               <Edit size={14} />

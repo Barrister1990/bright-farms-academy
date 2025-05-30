@@ -17,20 +17,32 @@ import {
   Users,
   Video
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import DashboardLayout from '../components/layout/DashboardLayout';
-import { supabase } from '../lib/supabase';
-const AdminAddCourse = () => {
+import useAdminCourseStore from '../store/adminCourseStore';
+
+const AdminEditCourse = () => {
+  const [searchParams] = useSearchParams();
+  const id = searchParams.get('cid');
   const [activeTab, setActiveTab] = useState('basic');
   const [currentStep, setCurrentStep] = useState(1);
   const [quizzes, setQuizzes] = useState([]);
 const [assignments, setAssignments] = useState([]);
+const [isLoading, setIsLoading] = useState(false);
+  const { 
+    getCourseForEdit, 
+    updateCompleteCourse, 
+    loading, 
+    error,
+    clearError 
+  } = useAdminCourseStore();
 
-const [isPublishing, setIsPublishing] = useState(false);
-    // Touch/swipe handling
   const navigate = useNavigate();
+  console.log(id)
+    // Touch/swipe handling
+
   // Course basic information
   const [courseData, setCourseData] = useState({
     title: '',
@@ -64,7 +76,6 @@ const [isPublishing, setIsPublishing] = useState(false);
     id: Date.now().toString(),
   title: '',
     duration: '',
-    position:'',
     lessons: [{
 
       title: '',
@@ -76,6 +87,48 @@ const [isPublishing, setIsPublishing] = useState(false);
       resources: ['']
     }]
   }]);
+
+
+   // Load course data for editing
+  useEffect(() => {
+    const loadCourseData = async () => {
+      if (!id) {
+        toast.error('Course ID is required');
+        navigate('/admin/courses');
+        return;
+      }
+
+      setIsLoading(true);
+      clearError();
+
+      try {
+        const result = await getCourseForEdit(id);
+        
+        if (result.success) {
+          const { courseData: course, instructorData: instructor, modules: moduleData, quizzes: quizData, assignments: assignmentData } = result.data;
+          
+          setCourseData(course);
+          setInstructorData(instructor);
+          setModules(moduleData);
+          setQuizzes(quizData);
+          setAssignments(assignmentData);
+          
+          toast.success('Course data loaded successfully');
+        } else {
+          toast.error(result.error || 'Failed to load course data');
+          navigate('/admin/courses');
+        }
+      } catch (err) {
+        toast.error('Error loading course data');
+        navigate('/admin/courses');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadCourseData();
+  }, [id, getCourseForEdit, navigate, clearError]);
+
   // Quiz Management Functions
 const addQuiz = () => {
   const newQuiz = {
@@ -228,7 +281,7 @@ const removeAssignmentArrayItem = (assignmentIndex, field, index) => {
      id: Date.now().toString(),
       title: '',
       duration: '',
-     postion: modules.length + 1,
+      position: "",
       lessons: [{
 
         title: '',
@@ -276,6 +329,14 @@ const removeAssignmentArrayItem = (assignmentIndex, field, index) => {
     updatedModules[moduleIndex].lessons[lessonIndex].videoUrl = URL.createObjectURL(file);
     setModules(updatedModules);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
 
   const renderBasicInfoStep = () => {
     switch (currentStep) {
@@ -1428,447 +1489,51 @@ const shouldShowNextButton = () => {
     setCurrentStep(1);
   };
 
-  const uploadFileToStorage = async (file, path) => {
-  const { data, error } = await supabase.storage.from('course-content').upload(path, file, {
-    cacheControl: '3600',
-    upsert: true
-  });
-  if (error) throw error;
-  const { data: urlData } = supabase.storage.from('course-content').getPublicUrl(path);
-  return urlData.publicUrl;
-};
-
-const saveCourseToSupabase = async () => {
-
-  setIsPublishing(true);
-  try {
-    // Validate required data before starting
-    if (!courseData.title || !courseData.slug) {
-      throw new Error('Course title and slug are required');
-    }
-
-    if (!instructorData.name) {
-      throw new Error('Instructor name is required');
-    }
-
-    if (modules.length === 0) {
-      throw new Error('At least one module is required');
-    }
-
-    console.log('Starting course save process...');
+ // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     
-    // Show loading toast
-    const loadingToast = toast.loading('Saving course to database...');
-    
-    // 1. Upload Course Image
-    let imageUrl = courseData.image;
-    if (courseData.image instanceof File) {
-      try {
-        console.log('Uploading course image...');
-        toast.loading('Uploading course image...', { id: loadingToast });
-        const imagePath = `images/${Date.now()}_${courseData.image.name}`;
-        imageUrl = await uploadFileToStorage(courseData.image, imagePath);
-        console.log('Course image uploaded successfully');
-      } catch (error) {
-        console.error('Error uploading course image:', error);
-        throw new Error(`Failed to upload course image: ${error.message}`);
+    if (!courseData.title.trim()) {
+      toast.error('Course title is required');
+      return;
+    }
+
+    if (!instructorData.name.trim()) {
+      toast.error('Instructor name is required');
+      return;
+    }
+
+    const loadingToast = toast.loading('Updating course...');
+
+    try {
+      const result = await updateCompleteCourse(
+        id,
+        courseData,
+        instructorData,
+        modules,
+        quizzes,
+        assignments
+      );
+
+      if (result.success) {
+      toast.success('Course successfully updated to database! navigating back', {
+  id: loadingToast,
+  duration: 4000,
+});
+
+// Delay navigation by 4 seconds
+setTimeout(() => {
+  navigate('/admin/courses');
+}, 4000);
+
+      } else {
+        toast.error(result.error || 'Failed to update course', { id: loadingToast });
       }
+    } catch (err) {
+      toast.error('Error updating course', { id: loadingToast });
     }
+  };
 
-    // 2. Upload Instructor Avatar
-    let avatarUrl = instructorData.avatar;
-    if (instructorData.avatar instanceof File) {
-      try {
-        console.log('Uploading instructor avatar...');
-        toast.loading('Uploading instructor avatar...', { id: loadingToast });
-        const avatarPath = `avatars/${Date.now()}_${instructorData.avatar.name}`;
-        avatarUrl = await uploadFileToStorage(instructorData.avatar, avatarPath);
-        console.log('Instructor avatar uploaded successfully');
-      } catch (error) {
-        console.error('Error uploading instructor avatar:', error);
-        throw new Error(`Failed to upload instructor avatar: ${error.message}`);
-      }
-    }
-
-    // 3. Insert Course
-    console.log('Inserting course data...');
-    toast.loading('Saving course information...', { id: loadingToast });
-    const courseInsertData = {
-      title: courseData.title,
-      slug: courseData.slug,
-      description: courseData.description,
-      shortDescription: courseData.shortDescription,
-      image: imageUrl,
-      categoryId: courseData.categoryId,
-      subcategory: courseData.subcategory,
-      level: courseData.level,
-      language: courseData.language,
-      price: courseData.price ? parseFloat(courseData.price) : null,
-      originalPrice: courseData.originalPrice ? parseFloat(courseData.originalPrice) : null,
-      requirements: courseData.requirements.filter(req => req.trim() !== ''),
-      whatYouWillLearn: courseData.whatYouWillLearn.filter(learn => learn.trim() !== ''),
-      targetAudience: courseData.targetAudience.filter(audience => audience.trim() !== ''),
-      featured: courseData.featured,
-      bestseller: courseData.bestseller
-    };
-
-    const { data: courseInsert, error: courseError } = await supabase
-      .from('courses')
-      .insert(courseInsertData)
-      .select()
-      .single();
-
-    if (courseError) {
-      console.error('Course insert error:', courseError);
-      throw new Error(`Failed to save course: ${courseError.message}`);
-    }
-
-    const courseId = courseInsert.id;
-    console.log('Course saved successfully with ID:', courseId);
-
-    // 4. Insert Instructor
-    console.log('Inserting instructor data...');
-    toast.loading('Saving instructor information...', { id: loadingToast });
-    const instructorInsertData = {
-      name: instructorData.name,
-      title: instructorData.title,
-      bio: instructorData.bio,
-      avatar: avatarUrl,
-      course_id: courseId // Note: using snake_case as per your original table
-    };
-
-    const { error: instructorError } = await supabase
-      .from('instructors')
-      .insert(instructorInsertData);
-
-    if (instructorError) {
-      console.error('Instructor insert error:', instructorError);
-      throw new Error(`Failed to save instructor: ${instructorError.message}`);
-    }
-    console.log('Instructor saved successfully');
-
-    // 5. Insert Modules and Lessons (and create module ID mapping)
-    console.log('Inserting modules and lessons...');
-    toast.loading('Saving modules and lessons...', { id: loadingToast });
-    const moduleIdMapping = {}; // Map from temporary module IDs to actual database IDs
-    
-    for (let moduleIndex = 0; moduleIndex < modules.length; moduleIndex++) {
-      const module = modules[moduleIndex];
-      
-      try {
-        console.log(`Processing module ${moduleIndex + 1}: ${module.title}`);
-        toast.loading(`Saving module ${moduleIndex + 1} of ${modules.length}...`, { id: loadingToast });
-        
-        const { data: moduleInsert, error: moduleError } = await supabase
-          .from('modules')
-          .insert({
-            position: parseInt(module.position),
-            title: module.title,
-            duration: module.duration,
-            course_id: courseId // Note: using snake_case as per your original table
-          })
-          .select()
-          .single();
-
-        if (moduleError) {
-          console.error(`Module ${moduleIndex + 1} insert error:`, moduleError);
-          throw new Error(`Failed to save module "${module.title}": ${moduleError.message}`);
-        }
-
-        const moduleId = moduleInsert.id;
-        console.log(`Module ${moduleIndex + 1} saved with ID:`, moduleId);
-
-        // Store mapping from temporary ID (or index) to actual database ID
-        if (module.id) {
-          moduleIdMapping[module.id] = moduleId;
-        }
-        // Also store by index as fallback
-        moduleIdMapping[moduleIndex] = moduleId;
-        // Store by title as another fallback (for assignments that might reference by title)
-        moduleIdMapping[module.title] = moduleId;
-
-        // Insert lessons for this module
-        for (let lessonIndex = 0; lessonIndex < module.lessons.length; lessonIndex++) {
-          const lesson = module.lessons[lessonIndex];
-          
-          try {
-            console.log(`Processing lesson ${lessonIndex + 1}: ${lesson.title}`);
-            
-            let lessonVideoUrl = lesson.videoUrl;
-
-            // Upload lesson video if it's a file
-            if (lesson.videoFile instanceof File) {
-              console.log(`Uploading video for lesson: ${lesson.title}`);
-              toast.loading(`Uploading video for lesson: ${lesson.title}...`, { id: loadingToast });
-              const videoPath = `videos/${Date.now()}_${lesson.videoFile.name}`;
-              lessonVideoUrl = await uploadFileToStorage(lesson.videoFile, videoPath);
-              console.log('Lesson video uploaded successfully');
-            }
-
-            const lessonInsertData = {
-              title: lesson.title,
-              duration: lesson.duration,
-              type: lesson.type,
-              preview: lesson.preview,
-              videoUrl: lessonVideoUrl, // Using camelCase as per your ALTER statements
-              resources: lesson.resources.filter(resource => resource.trim() !== ''),
-              module_id: moduleId // Note: using snake_case as per your original table
-            };
-
-            const { error: lessonError } = await supabase
-              .from('lessons')
-              .insert(lessonInsertData);
-
-            if (lessonError) {
-              console.error(`Lesson ${lessonIndex + 1} insert error:`, lessonError);
-              throw new Error(`Failed to save lesson "${lesson.title}": ${lessonError.message}`);
-            }
-            
-            console.log(`Lesson ${lessonIndex + 1} saved successfully`);
-          } catch (lessonError) {
-            throw new Error(`Error processing lesson "${lesson.title}": ${lessonError.message}`);
-          }
-        }
-      } catch (moduleError) {
-        throw new Error(`Error processing module "${module.title}": ${moduleError.message}`);
-      }
-    }
-
-    // 6. Insert Quizzes (with proper module ID mapping)
-    if (quizzes.length > 0) {
-      console.log('Inserting quizzes...');
-      toast.loading('Saving quizzes...', { id: loadingToast });
-      
-      for (let quizIndex = 0; quizIndex < quizzes.length; quizIndex++) {
-        const quiz = quizzes[quizIndex];
-        
-        try {
-          console.log(`Processing quiz ${quizIndex + 1}: ${quiz.title}`);
-          toast.loading(`Saving quiz ${quizIndex + 1} of ${quizzes.length}...`, { id: loadingToast });
-          
-          // Get the actual module ID from our mapping using the selected module title
-          let actualModuleId = null;
-          if (quiz.moduleId) {
-            // Find the module by title
-            const selectedModule = modules.find(m => m.title === quiz.moduleId);
-            if (selectedModule) {
-              // Get the actual database ID from our mapping
-              actualModuleId = moduleIdMapping[selectedModule.title];
-              if (!actualModuleId) {
-                // Try mapping by temporary ID as fallback
-                actualModuleId = moduleIdMapping[selectedModule.id];
-              }
-              if (!actualModuleId) {
-                // Try mapping by index as final fallback
-                const moduleIndex = modules.findIndex(m => m.title === quiz.moduleId);
-                actualModuleId = moduleIdMapping[moduleIndex];
-              }
-            }
-            
-            if (!actualModuleId) {
-              console.warn(`Could not find module ID mapping for quiz "${quiz.title}" with module: ${quiz.moduleId}`);
-            }
-          }
-          
-          const quizInsertData = {
-            title: quiz.title,
-            description: quiz.description,
-            timeLimit: quiz.timeLimit,
-            passingScore: quiz.passingScore,
-            moduleId: actualModuleId, // Using the actual database module ID
-            course_id: courseId
-          };
-
-          const { data: quizInsert, error: quizError } = await supabase
-            .from('quizzes')
-            .insert(quizInsertData)
-            .select()
-            .single();
-
-          if (quizError) {
-            console.error(`Quiz ${quizIndex + 1} insert error:`, quizError);
-            throw new Error(`Failed to save quiz "${quiz.title}": ${quizError.message}`);
-          }
-
-          const quizId = quizInsert.id;
-          console.log(`Quiz ${quizIndex + 1} saved with ID:`, quizId);
-
-          // Insert questions for this quiz
-          if (quiz.questions && quiz.questions.length > 0) {
-            for (let questionIndex = 0; questionIndex < quiz.questions.length; questionIndex++) {
-              const question = quiz.questions[questionIndex];
-              
-              try {
-                const questionInsertData = {
-                  quiz_id: quizId,
-                  question: question.question,
-                  type: question.type,
-                  options: question.options.filter(option => option.trim() !== ''),
-                  correctAnswer: question.correctAnswer,
-                  correctAnswers: question.correctAnswers || [],
-                  explanation: question.explanation
-                };
-
-                const { error: questionError } = await supabase
-                  .from('questions')
-                  .insert(questionInsertData);
-
-                if (questionError) {
-                  console.error(`Question ${questionIndex + 1} insert error:`, questionError);
-                  throw new Error(`Failed to save question ${questionIndex + 1} in quiz "${quiz.title}": ${questionError.message}`);
-                }
-              } catch (questionError) {
-                throw new Error(`Error processing question ${questionIndex + 1} in quiz "${quiz.title}": ${questionError.message}`);
-              }
-            }
-          }
-        } catch (quizError) {
-          throw new Error(`Error processing quiz "${quiz.title}": ${quizError.message}`);
-        }
-      }
-    }
-
-    // 7. Insert Assignments (with proper module ID mapping)
-    if (assignments.length > 0) {
-      console.log('Inserting assignments...');
-      toast.loading('Saving assignments...', { id: loadingToast });
-      
-      for (let assignmentIndex = 0; assignmentIndex < assignments.length; assignmentIndex++) {
-        const assignment = assignments[assignmentIndex];
-        
-        try {
-          console.log(`Processing assignment ${assignmentIndex + 1}: ${assignment.title}`);
-          toast.loading(`Saving assignment ${assignmentIndex + 1} of ${assignments.length}...`, { id: loadingToast });
-          
-          // Get the actual module ID from our mapping using the selected module title
-          let actualModuleId = null;
-          if (assignment.moduleId) {
-            // Find the module by title
-            const selectedModule = modules.find(m => m.title === assignment.moduleId);
-            if (selectedModule) {
-              // Get the actual database ID from our mapping
-              actualModuleId = moduleIdMapping[selectedModule.title];
-              if (!actualModuleId) {
-                // Try mapping by temporary ID as fallback
-                actualModuleId = moduleIdMapping[selectedModule.id];
-              }
-              if (!actualModuleId) {
-                // Try mapping by index as final fallback
-                const moduleIndex = modules.findIndex(m => m.title === assignment.moduleId);
-                actualModuleId = moduleIdMapping[moduleIndex];
-              }
-            }
-            
-            if (!actualModuleId) {
-              console.warn(`Could not find module ID mapping for assignment "${assignment.title}" with module: ${assignment.moduleId}`);
-            }
-          }
-          
-          const assignmentInsertData = {
-            title: assignment.title,
-            description: assignment.description,
-            estimatedTime: assignment.estimatedTime,
-            submissionFormat: assignment.submissionFormat,
-            moduleId: actualModuleId, // Using the actual database module ID
-            instructions: assignment.instructions.filter(instruction => instruction.trim() !== ''),
-            deliverables: assignment.deliverables.filter(deliverable => deliverable.trim() !== ''),
-            resources: assignment.resources.filter(resource => resource.trim() !== ''),
-            tips: assignment.tips.filter(tip => tip.trim() !== ''),
-            rubric: assignment.rubric || {},
-            course_id: courseId
-          };
-
-          const { error: assignmentError } = await supabase
-            .from('assignments')
-            .insert(assignmentInsertData);
-
-          if (assignmentError) {
-            console.error(`Assignment ${assignmentIndex + 1} insert error:`, assignmentError);
-            throw new Error(`Failed to save assignment "${assignment.title}": ${assignmentError.message}`);
-          }
-          
-          console.log(`Assignment ${assignmentIndex + 1} saved successfully`);
-        } catch (assignmentError) {
-          throw new Error(`Error processing assignment "${assignment.title}": ${assignmentError.message}`);
-        }
-      }
-    }
-
-    console.log('Course save process completed successfully!');
-    
-    // Dismiss loading toast and show success
-    toast.success('Course successfully saved to database!', { 
-      id: loadingToast,
-      duration: 4000 
-    });
-    
-    // Optional: Reset form or redirect user
-    resetForm();
-    navigate('/admin/courses');
-    
-  } catch (error) {
-    console.error('Complete error details:', error);
-    
-    // Show error toast
-    toast.error(`Error saving course: ${error.message}`, {
-      duration: 6000,
-      style: {
-        maxWidth: '500px',
-      },
-    });
-    setIsPublishing(false);
-    // Optional: Log error to external service
-    // logErrorToService(error, { courseData, instructorData, modules, quizzes, assignments });
-  }finally{
-    setIsPublishing(false);
-  }
-};
-
-// Helper function to reset form (optional)
-const resetForm = () => {
-  setCourseData({
-    title: '',
-    slug: '',
-    description: '',
-    shortDescription: '',
-    image: '',
-    categoryId: '',
-    subcategory: '',
-    level: 'Beginner',
-    language: 'English',
-    price: '',
-    originalPrice: '',
-    requirements: [''],
-    whatYouWillLearn: [''],
-    targetAudience: [''],
-    featured: false,
-    bestseller: false
-  });
-  
-  setInstructorData({
-    name: '',
-    title: '',
-    bio: '',
-    avatar: ''
-  });
-  
-  setModules([{
-    title: '',
-    duration: '',
-    lessons: [{
-      title: '',
-      duration: '',
-      type: 'video',
-      preview: false,
-      videoUrl: '',
-      videoFile: null,
-      resources: ['']
-    }]
-  }]);
-  
-  setQuizzes([]);
-  setAssignments([]);
-};
 
 
 
@@ -1967,41 +1632,12 @@ const resetForm = () => {
       </button>
     ) : (
       <button
-  onClick={saveCourseToSupabase}
-  disabled={isPublishing}
-  className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
-    isPublishing 
-      ? 'bg-blue-400 cursor-not-allowed' 
-      : 'bg-blue-600 hover:bg-blue-700'
-  } text-white`}
->
-  {isPublishing ? (
-    <>
-      <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">
-        <circle
-          className="opacity-25"
-          cx="12"
-          cy="12"
-          r="10"
-          stroke="currentColor"
-          strokeWidth="4"
-          fill="none"
-        />
-        <path
-          className="opacity-75"
-          fill="currentColor"
-          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-        />
-      </svg>
-      Publishing...
-    </>
-  ) : (
-    <>
-      <CheckCircle className="h-4 w-4 mr-2" />
-      Publish Course
-    </>
-  )}
-</button>
+        onClick={handleSubmit}
+        className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+      >
+        <CheckCircle className="h-4 w-4 mr-2" />
+        Update Course
+      </button>
     )}
   </div>
 </div>
@@ -2062,4 +1698,4 @@ const resetForm = () => {
   );
 };
 
-export default AdminAddCourse;
+export default AdminEditCourse;

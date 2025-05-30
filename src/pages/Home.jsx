@@ -87,7 +87,7 @@ const Home = () => {
           }}
         />
         <div className="absolute top-1 right-1 bg-emerald-500 text-white px-1 py-0.5 rounded text-xs font-medium">
-          ${course.price || 0}
+          Free
         </div>
         {course.bestseller && (
           <div className="absolute top-1 left-1 bg-orange-500 text-white px-1 py-0.5 rounded text-xs font-medium">
@@ -137,7 +137,7 @@ const Home = () => {
           }}
         />
         <div className="absolute top-3 right-3 bg-emerald-500 text-white px-2 py-1 rounded text-sm font-semibold">
-          ${course.price || 0}
+          Free
         </div>
         {course.bestseller && (
           <div className="absolute top-3 left-3 bg-orange-500 text-white px-2 py-1 rounded text-xs font-semibold">
@@ -151,7 +151,7 @@ const Home = () => {
         )}
         {course.discount > 0 && (
           <div className="absolute bottom-3 right-3 bg-red-500 text-white px-2 py-1 rounded text-xs font-semibold">
-            {course.discount}% OFF
+            Free
           </div>
         )}
       </div>
@@ -185,11 +185,9 @@ const Home = () => {
         </div>
         {course.originalPrice && course.originalPrice > course.price && (
           <div className="flex items-center mb-2">
-            <span className="text-gray-400 line-through text-sm mr-2">
-              ${course.originalPrice}
-            </span>
+    
             <span className="text-emerald-600 font-semibold">
-              ${course.price}
+              Free
             </span>
           </div>
         )}
@@ -437,67 +435,127 @@ const Home = () => {
       </section>
 
       {/* Personalized Section for Logged-in Users */}
-      {isLoggedIn && (
-        <section className="py-8 md:py-16 bg-blue-50">
-          <div className="container mx-auto px-4">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
-              <div className="bg-white rounded-lg md:rounded-xl p-4 md:p-6 shadow-md hover:shadow-lg transition-shadow duration-300">
-                <div className="flex items-center mb-3 md:mb-4">
-                  <div className="w-8 h-8 md:w-12 md:h-12 bg-blue-100 rounded-full flex items-center justify-center mr-2 md:mr-3">
-                    <span className="text-lg md:text-2xl">📚</span>
-                  </div>
-                  <h3 className="text-lg md:text-xl font-semibold text-gray-800">Continue Learning</h3>
-                </div>
-                <p className="text-sm md:text-base text-gray-600 mb-3 md:mb-4">
-                  Pick up where you left off in your enrolled courses
-                </p>
-                <Link 
-                  to="/dashboard"
-                  className="inline-block bg-blue-600 text-white px-3 md:px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors duration-300 text-sm md:text-base"
-                >
-                  View My Courses
-                </Link>
+ {isLoggedIn && (
+  <section className="py-8 md:py-16 bg-blue-50">
+    <div className="container mx-auto px-4">
+      {/* Mobile: Horizontal scroll */}
+      <div className="lg:hidden overflow-x-auto pb-4">
+        <div className="flex gap-4 min-w-max">
+          <div className="bg-white rounded-lg p-4 shadow-md hover:shadow-lg transition-shadow duration-300 w-72 flex-shrink-0">
+            <div className="flex items-center mb-3">
+              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-2">
+                <span className="text-lg">📚</span>
               </div>
-
-              <div className="bg-white rounded-lg md:rounded-xl p-4 md:p-6 shadow-md hover:shadow-lg transition-shadow duration-300">
-                <div className="flex items-center mb-3 md:mb-4">
-                  <div className="w-8 h-8 md:w-12 md:h-12 bg-green-100 rounded-full flex items-center justify-center mr-2 md:mr-3">
-                    <span className="text-lg md:text-2xl">📊</span>
-                  </div>
-                  <h3 className="text-lg md:text-xl font-semibold text-gray-800">Your Progress</h3>
-                </div>
-                <p className="text-sm md:text-base text-gray-600 mb-3 md:mb-4">
-                  Track your learning achievements and milestones
-                </p>
-                <Link 
-                  to="/progress"
-                  className="inline-block bg-green-600 text-white px-3 md:px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors duration-300 text-sm md:text-base"
-                >
-                  View Progress
-                </Link>
-              </div>
-
-              <div className="bg-white rounded-lg md:rounded-xl p-4 md:p-6 shadow-md hover:shadow-lg transition-shadow duration-300">
-                <div className="flex items-center mb-3 md:mb-4">
-                  <div className="w-8 h-8 md:w-12 md:h-12 bg-red-100 rounded-full flex items-center justify-center mr-2 md:mr-3">
-                    <span className="text-lg md:text-2xl">❤️</span>
-                  </div>
-                  <h3 className="text-lg md:text-xl font-semibold text-gray-800">Your Wishlist</h3>
-                </div>
-                <p className="text-sm md:text-base text-gray-600 mb-3 md:mb-4">
-                  Courses you've saved for later
-                </p>
-                <Link 
-                  to="/wishlist"
-                  className="inline-block bg-red-600 text-white px-3 md:px-4 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors duration-300 text-sm md:text-base"
-                >
-                  View Wishlist
-                </Link>
-              </div>
+              <h3 className="text-lg font-semibold text-gray-800">Continue Learning</h3>
             </div>
+            <p className="text-sm text-gray-600 mb-3">
+              Pick up where you left off in your enrolled courses
+            </p>
+            <Link
+              to="/dashboard"
+              className="inline-block bg-blue-600 text-white px-3 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors duration-300 text-sm"
+            >
+              View My Courses
+            </Link>
           </div>
-        </section>
-      )}
+          
+          <div className="bg-white rounded-lg p-4 shadow-md hover:shadow-lg transition-shadow duration-300 w-72 flex-shrink-0">
+            <div className="flex items-center mb-3">
+              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-2">
+                <span className="text-lg">📊</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-800">Your Progress</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-3">
+              Track your learning achievements and milestones
+            </p>
+            <Link
+              to="/dashboard"
+              className="inline-block bg-green-600 text-white px-3 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors duration-300 text-sm"
+            >
+              View Progress
+            </Link>
+          </div>
+          
+          <div className="bg-white rounded-lg p-4 shadow-md hover:shadow-lg transition-shadow duration-300 w-72 flex-shrink-0">
+            <div className="flex items-center mb-3">
+              <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center mr-2">
+                <span className="text-lg">❤️</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-800">Your Wishlist</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-3">
+              Courses you've saved for later
+            </p>
+            <Link
+              to="/dashboard"
+              className="inline-block bg-red-600 text-white px-3 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors duration-300 text-sm"
+            >
+              View Wishlist
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop: Grid layout */}
+      <div className="hidden lg:grid grid-cols-3 gap-8">
+        <div className="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow duration-300">
+          <div className="flex items-center mb-4">
+            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+              <span className="text-2xl">📚</span>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-800">Continue Learning</h3>
+          </div>
+          <p className="text-base text-gray-600 mb-4">
+            Pick up where you left off in your enrolled courses
+          </p>
+          <Link
+            to="/dashboard"
+            className="inline-block bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors duration-300 text-base"
+          >
+            View My Courses
+          </Link>
+        </div>
+        
+        <div className="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow duration-300">
+          <div className="flex items-center mb-4">
+            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mr-3">
+              <span className="text-2xl">📊</span>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-800">Your Progress</h3>
+          </div>
+          <p className="text-base text-gray-600 mb-4">
+            Track your learning achievements and milestones
+          </p>
+          <Link
+            to="/progress"
+            className="inline-block bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors duration-300 text-base"
+          >
+            View Progress
+          </Link>
+        </div>
+        
+        <div className="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow duration-300">
+          <div className="flex items-center mb-4">
+            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-3">
+              <span className="text-2xl">❤️</span>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-800">Your Wishlist</h3>
+          </div>
+          <p className="text-base text-gray-600 mb-4">
+            Courses you've saved for later
+          </p>
+          <Link
+            to="/wishlist"
+            className="inline-block bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors duration-300 text-base"
+          >
+            View Wishlist
+          </Link>
+        </div>
+      </div>
+    </div>
+  </section>
+)}
 
       {/* Popular Categories Section */}
       <section className="py-8 md:py-16 bg-gray-50">

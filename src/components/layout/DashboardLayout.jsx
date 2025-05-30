@@ -1,21 +1,19 @@
 import {
-    Bell,
-    BookOpen,
-    ChevronDown,
-    Home,
-    LogOut,
-    Menu,
-    Search,
-    Settings,
-    User,
-    X
+  Bell,
+  BookOpen,
+  ChevronDown,
+  Home,
+  LogOut,
+  Menu,
+  Search,
+  X
 } from 'lucide-react';
 import { useState } from 'react';
-
+import { Link, useNavigate } from 'react-router-dom';
 const DashboardLayout = ({ children, currentPage = 'Dashboard' }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
-
+ const navigate = useNavigate();
   const sidebarItems = [
     { icon: Home, label: 'Dashboard', href: '/admin', active: currentPage === 'Dashboard' },
     { 
@@ -100,10 +98,13 @@ const DashboardLayout = ({ children, currentPage = 'Dashboard' }) => {
         </nav>
         
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
-          <button className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg">
-            <LogOut className="w-5 h-5 mr-3" />
-            Sign Out
-          </button>
+          <button
+      onClick={() => navigate('/dashboard')}
+      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
+    >
+      <LogOut className="w-5 h-5 mr-3" />
+      Go to Home
+    </button>
         </div>
       </div>
 
@@ -163,19 +164,15 @@ const DashboardLayout = ({ children, currentPage = 'Dashboard' }) => {
                 
                 {profileDropdownOpen && (
                   <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
-                    <a href="#" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                      <User className="w-4 h-4 mr-3" />
-                      Your Profile
-                    </a>
-                    <a href="#" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                      <Settings className="w-4 h-4 mr-3" />
-                      Settings
-                    </a>
+                   
                     <div className="border-t border-gray-100"></div>
-                    <a href="#" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                      <LogOut className="w-4 h-4 mr-3" />
-                      Sign out
-                    </a>
+                    <Link
+  to="/dashboard"
+  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+>
+  <LogOut className="w-4 h-4 mr-3" />
+  Go to Home
+</Link>
                   </div>
                 )}
               </div>

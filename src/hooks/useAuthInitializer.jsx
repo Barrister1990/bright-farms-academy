@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { Sprout } from 'lucide-react';
 import { useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import useUserStore from '../store/userStore';
 
@@ -172,9 +172,10 @@ const LoadingScreen = () => {
   );
 };
 
-// Protected Route Component with enhanced dashboard access
+// Protected Route Component with enhanced admin access control
 const ProtectedRoute = ({ children, requiredRole = null }) => {
   const { isLoggedIn, isInitialized, user } = useUserStore();
+  const location = useLocation();
 
   // Show beautiful loading while initializing
   if (!isInitialized) {
@@ -186,15 +187,31 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
     return <Navigate to="/auth/login" replace />;
   }
 
-  // Enhanced role checking - allow both admin and student to access dashboard
+  // Check for admin-only routes (any route starting with /admin)
+  if (location.pathname.startsWith('/admin')) {
+    // Only admins can access /admin/* routes
+    if (user?.role !== 'admin') {
+      return <Navigate to="/dashboard" replace />;
+    }
+  }
+
+  // Enhanced role checking for other routes
   if (requiredRole) {
     // If specific role is required and user doesn't have it
     if (user?.role !== requiredRole) {
-      // Special case: if trying to access dashboard, allow both admin and student
-      if (window.location.pathname === '/dashboard' && ['admin', 'student'].includes(user?.role)) {
+      // Special cases where both admin and student can access
+      const allowedRoutes = ['/dashboard', '/admin']; // Both roles can access these
+      
+      if (allowedRoutes.includes(location.pathname) && ['admin', 'student'].includes(user?.role)) {
         return children;
       }
-      // Otherwise redirect to dashboard (which they can access)
+      
+      // For /admin route specifically, allow both admin and student
+      if (location.pathname === '/admin' && ['admin', 'student'].includes(user?.role)) {
+        return children;
+      }
+      
+      // Otherwise redirect to dashboard
       return <Navigate to="/dashboard" replace />;
     }
   }

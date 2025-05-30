@@ -9,7 +9,7 @@ const AuthPage = () => {
   const { mode } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isLoggedIn } = useUserStore();
+  const { login, isLoggedIn, initializeAuth } = useUserStore();
   
   const [currentMode, setCurrentMode] = useState(mode || 'login');
   const [showPassword, setShowPassword] = useState(false);
@@ -23,6 +23,7 @@ const AuthPage = () => {
   
   // Redirect if already logged in
   useEffect(() => {
+    initializeAuth()
     if (isLoggedIn) {
       navigate('/dashboard', { replace: true });
     }
@@ -86,81 +87,92 @@ const AuthPage = () => {
     }
   };
 
-  const handleLoginSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+const handleLoginSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError('');
 
-    try {
-      // Sign in with Supabase
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: loginData.email,
-        password: loginData.password,
-      });
+  try {
+    // Sign in with Supabase
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: loginData.email,
+      password: loginData.password,
+    });
 
-      if (authError) {
-        // Check if the error is due to email not confirmed
-        if (authError.message === 'Email not confirmed' || 
-            authError.message.includes('not confirmed') ||
-            authError.message.includes('verification')) {
-          
-          // Attempt to resend confirmation email
-          // Resend confirmation email if email is not confirmed
-          const redirectTo = `${siteUrl}/email-confirmation`;
-          const {data:emailSent, error: resendError } = await supabase.auth.resend({
-            type: 'signup',
-            email: loginData.email,
-            options: {
-              emailRedirectTo: redirectTo, // Update with the correct redirect URL
-            },
-          });
-          if (resendError) throw resendError;
-          
-          if (emailSent) {
-            setUserEmail(loginData.email);
-            setConfirmationMessage('Your email address is not verified yet. We\'ve sent you a new confirmation email.');
-            setShowConfirmation(true);
-          } else {
-            setError('Your email is not confirmed. Please check your email for the confirmation link or try again later.');
-          }
-          return;
-        }
+    if (authError) {
+      // Check if the error is due to email not confirmed
+      if (authError.message === 'Email not confirmed' ||
+          authError.message.includes('not confirmed') ||
+          authError.message.includes('verification')) {
         
-        throw authError;
+        // Attempt to resend confirmation email
+        // Resend confirmation email if email is not confirmed
+        const redirectTo = `${siteUrl}/email-confirmation`;
+        const {data: emailSent, error: resendError } = await supabase.auth.resend({
+          type: 'signup',
+          email: loginData.email,
+          options: {
+            emailRedirectTo: redirectTo, // Update with the correct redirect URL
+          },
+        });
+        if (resendError) throw resendError;
+        
+        if (emailSent) {
+          setUserEmail(loginData.email);
+          setConfirmationMessage('Your email address is not verified yet. We\'ve sent you a new confirmation email.');
+          setShowConfirmation(true);
+        } else {
+          setError('Your email is not confirmed. Please check your email for the confirmation link or try again later.');
+        }
+        return;
       }
-
-      // Get user profile data including role
-      const { data: profileData, error: profileError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', authData.user.id)
-        .single();
-
-      if (profileError) {
-        console.error('Error fetching profile:', profileError);
-        // Still proceed with login even if profile fetch fails
-      }
-
-      // Update Zustand store
-      login({
-        id: authData.user.id,
-        email: authData.user.email,
-        username: profileData?.username || authData.user.email.split('@')[0],
-        fullName: profileData?.full_name || '',
-        role: profileData?.role || 'student'
-      });
-
-      // Navigate to intended destination or dashboard
-      const from = location.state?.from?.pathname || '/dashboard';
-      navigate(from, { replace: true });
-
-    } catch (error) {
-      console.error('Login error:', error);
-      setError(error.message || 'An error occurred during login');
-    } finally {
-      setLoading(false);
+      
+      throw authError;
     }
-  };
+
+    // Get user profile data including role
+    const { data: profileData, error: profileError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', authData.user.id)
+      .single();
+
+    if (profileError) {
+      console.error('Error fetching profile:', profileError);
+      // Still proceed with login even if profile fetch fails
+    }
+
+    const userRole = profileData?.role || 'student';
+
+    // Update Zustand store
+    login({
+      id: authData.user.id,
+      email: authData.user.email,
+      username: profileData?.username || authData.user.email.split('@')[0],
+      fullName: profileData?.full_name || '',
+      role: userRole
+    });
+
+    // Navigate based on user role and intended destination
+    let navigationPath;
+
+    if (userRole == 'admin') {
+      // Admin users go to admin route by default
+      navigationPath = '/admin';
+    } else {
+      // Other users go to dashboard or their intended destination
+      navigationPath = location.state?.from?.pathname || '/dashboard';
+    }
+
+    navigate(navigationPath, { replace: true });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    setError(error.message || 'An error occurred during login');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();

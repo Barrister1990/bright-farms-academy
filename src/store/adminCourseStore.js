@@ -40,27 +40,28 @@ const fetchAllData = async () => {
       const totalLessons = courseModules.reduce((total, module) => 
         total + (module.lessons?.length || 0), 0);
       const totalDuration = courseModules.reduce((total, module) => 
-        total + (parseFloat(module.duration) || 0), 0);
+        total + (module.duration || 0), 0);
 
       return {
         id: course.id,
         title: course.title,
         slug: course.slug,
         description: course.description,
-        shortDescription: course.short_description,
+        shortDescription: course.shortDescription,
         image: course.image,
         instructor: instructor ? {
           id: instructor.id,
           name: instructor.name,
           title: instructor.title,
-          avatar: instructor.avatar
+          avatar: instructor.avatar,
+          bio: instructor.bio
         } : null,
-        categoryId: course.category_id,
+        categoryId: course.categoryId,
         subcategory: course.subcategory,
         level: course.level,
         language: course.language,
         price: course.price || 0,
-        originalPrice: course.original_price,
+        originalPrice: course.originalPrice,
         rating: course.rating || 0,
         reviewsCount: course.reviews_count || 0,
         studentsCount: course.students_count || 0,
@@ -73,6 +74,9 @@ const fetchAllData = async () => {
         createdAt: course.created_at,
         updatedAt: course.updated_at,
         publishedAt: course.created_at,
+        requirements: course.requirements || [],
+        whatYouWillLearn: course.whatYouWillLearn || [],
+        targetAudience: course.targetAudience || [],
         modules: courseModules,
         quizzes: courseQuizzes,
         assignments: courseAssignments
@@ -252,10 +256,10 @@ const useAdminCourseStore = create(
           filtered = filtered.filter(course => course.status === filters.status);
         }
         if (filters.category) {
-          filtered = filtered.filter(course => course.categoryId === parseInt(filters.category));
+          filtered = filtered.filter(course => course.categoryId === filters.category);
         }
         if (filters.instructor) {
-          filtered = filtered.filter(course => course.instructor?.id === parseInt(filters.instructor));
+          filtered = filtered.filter(course => course.instructor?.id === filters.instructor);
         }
         if (filters.level) {
           filtered = filtered.filter(course => course.level === filters.level);
@@ -334,6 +338,148 @@ const useAdminCourseStore = create(
       getCourseById: (id) => {
         const { courses } = get();
         return courses.find(course => course.id === id);
+      },
+
+      // NEW: Get complete course data for editing
+      getCourseForEdit: async (id) => {
+        try {
+          set({ loading: true, error: null });
+          
+          // Fetch complete course data with all relationships
+          const [courseRes, modulesRes, quizzesRes, assignmentsRes, instructorRes] = await Promise.all([
+            supabase.from('courses').select('*').eq('id', id).single(),
+            supabase.from('modules').select('*, lessons (*)').eq('course_id', id).order('id', { ascending: true }),
+            supabase.from('quizzes').select('*, questions (*)').eq('course_id', id),
+            supabase.from('assignments').select('*').eq('course_id', id),
+            supabase.from('instructors').select('*').eq('course_id', id).single()
+          ]);
+
+          if (courseRes.error) throw courseRes.error;
+          if (modulesRes.error) throw modulesRes.error;
+          if (quizzesRes.error) throw quizzesRes.error;
+          if (assignmentsRes.error) throw assignmentsRes.error;
+          if (instructorRes.error) throw instructorRes.error;
+
+          const course = courseRes.data;
+          const modules = modulesRes.data;
+          const quizzes = quizzesRes.data;
+          const assignments = assignmentsRes.data;
+          const instructor = instructorRes.data;
+
+          // Format data for the form
+          const courseData = {
+            title: course.title || '',
+            slug: course.slug || '',
+            description: course.description || '',
+            shortDescription: course.shortDescription || '',
+            image: course.image || '',
+            categoryId: course.categoryId || '',
+            subcategory: course.subcategory || '',
+            level: course.level || 'Beginner',
+            language: course.language || 'English',
+            price: course.price || '',
+            originalPrice: course.originalPrice || '',
+            requirements: course.requirements || [''],
+            whatYouWillLearn: course.whatYouWillLearn || [''],
+            targetAudience: course.targetAudience || [''],
+            featured: course.featured || false,
+            bestseller: course.bestseller || false
+          };
+
+          const instructorData = {
+            name: instructor.name || '',
+            title: instructor.title || '',
+            bio: instructor.bio || '',
+            avatar: instructor.avatar || ''
+          };
+
+          // Format modules with lessons
+          const formattedModules = modules.map(module => ({
+            id: module.id.toString(),
+            title: module.title || '',
+            duration: module.duration?.toString() || '',
+            lessons: module.lessons.map(lesson => ({
+              id: lesson.id,
+              title: lesson.title || '',
+              duration: lesson.duration?.toString() || '',
+              type: lesson.type || 'video',
+              preview: lesson.preview || false,
+              videoUrl: lesson.videoUrl || '',
+              videoFile: null,
+              resources: lesson.resources || ['']
+            }))
+          }));
+
+          // Add empty module if no modules exist
+          const modulesData = formattedModules.length > 0 ? formattedModules : [{
+            id: Date.now().toString(),
+            title: '',
+            duration: '',
+            lessons: [{
+              title: '',
+              duration: '',
+              type: 'video',
+              preview: false,
+              videoUrl: '',
+              videoFile: null,
+              resources: ['']
+            }]
+          }];
+
+          // Format quizzes
+          const formattedQuizzes = quizzes.map(quiz => ({
+            id: quiz.id,
+            title: quiz.title || '',
+            description: quiz.description || '',
+            moduleId: quiz.moduleId ? modules.find(m => m.id === quiz.moduleId)?.title || '' : '',
+            timeLimit: quiz.timeLimit || 10,
+            passingScore: quiz.passingScore || 70,
+            questions: quiz.questions.map(question => ({
+              id: question.id,
+              type: question.type || 'multiple-choice',
+              question: question.question || '',
+              options: question.options || ['', '', '', ''],
+              correctAnswer: question.correctAnswer || 0,
+              correctAnswers: question.correctAnswers || [],
+              explanation: question.explanation || ''
+            }))
+          }));
+
+          // Format assignments
+          const formattedAssignments = assignments.map(assignment => ({
+            id: assignment.id,
+            title: assignment.title || '',
+            description: assignment.description || '',
+            estimatedTime: assignment.estimatedTime || '',
+            moduleId: assignment.moduleId ? modules.find(m => m.id === assignment.moduleId)?.title || '' : '',
+            instructions: assignment.instructions || [''],
+            deliverables: assignment.deliverables || [''],
+            resources: assignment.resources || [''],
+            rubric: assignment.rubric || {},
+            submissionFormat: assignment.submissionFormat || '',
+            tips: assignment.tips || ['']
+          }));
+
+          set({ loading: false });
+
+          return {
+            success: true,
+            data: {
+              courseData,
+              instructorData,
+              modules: modulesData,
+              quizzes: formattedQuizzes,
+              assignments: formattedAssignments
+            }
+          };
+
+        } catch (error) {
+          set({ loading: false, error: error.message });
+          return {
+            success: false,
+            error: error.message
+          };
+        }
       },
 
       getCategoryById: (id) => {
@@ -437,9 +583,9 @@ const useAdminCourseStore = create(
               title: courseData.title,
               slug: courseData.title?.toLowerCase().replace(/\s+/g, '-'),
               description: courseData.description,
-              short_description: courseData.shortDescription,
+              shortDescription: courseData.shortDescription,
               image: courseData.image,
-              category_id: courseData.categoryId,
+              categoryId: courseData.categoryId,
               level: courseData.level,
               language: courseData.language,
               price: courseData.price || 0,
@@ -478,14 +624,10 @@ const useAdminCourseStore = create(
 
           if (error) throw error;
 
-          // Update local state
-          set(state => ({
-            courses: state.courses.map(c =>
-              c.id === id ? { ...c, ...updates } : c
-            ),
-            loading: false
-          }));
+          // Refresh data to get updated course with relationships
+          await get().refreshData();
 
+          set({ loading: false });
           return { success: true, data };
         } catch (error) {
           set({ error: error.message, loading: false });
@@ -493,16 +635,306 @@ const useAdminCourseStore = create(
         }
       },
 
+      // NEW: Update complete course (course + instructor + modules + quizzes + assignments)
+      updateCompleteCourse: async (courseId, courseData, instructorData, modules, quizzes, assignments) => {
+        try {
+          set({ loading: true, error: null });
+          console.log(courseId)
+          // Helper function to upload file to storage
+          const uploadFileToStorage = async (file, path) => {
+            const { data, error } = await supabase.storage.from('course-content').upload(path, file, {
+              cacheControl: '3600',
+              upsert: true
+            });
+            if (error) throw error;
+            const { data: urlData } = supabase.storage.from('course-content').getPublicUrl(path);
+            return urlData.publicUrl;
+          };
+
+          // 1. Handle course image upload
+          let imageUrl = courseData.image;
+          if (courseData.image instanceof File) {
+            const imagePath = `images/${Date.now()}_${courseData.image.name}`;
+            imageUrl = await uploadFileToStorage(courseData.image, imagePath);
+          }
+
+          // 2. Update course
+          const courseUpdateData = {
+            title: courseData.title,
+            slug: courseData.slug,
+            description: courseData.description,
+            shortDescription: courseData.shortDescription,
+            image: imageUrl,
+            categoryId: courseData.categoryId,
+            subcategory: courseData.subcategory,
+            level: courseData.level,
+            language: courseData.language,
+            price: courseData.price ? courseData.price : null,
+            originalPrice: courseData.originalPrice ? courseData.originalPrice : null,
+            requirements: courseData.requirements.filter(req => req.trim() !== ''),
+            whatYouWillLearn: courseData.whatYouWillLearn.filter(learn => learn.trim() !== ''),
+            targetAudience: courseData.targetAudience.filter(audience => audience.trim() !== ''),
+            featured: courseData.featured,
+            bestseller: courseData.bestseller,
+            updated_at: new Date().toISOString()
+          };
+
+          const { error: courseError } = await supabase
+            .from('courses')
+            .update(courseUpdateData)
+            .eq('id', courseId);
+
+          if (courseError) throw courseError;
+
+          // 3. Handle instructor avatar upload and update
+          let avatarUrl = instructorData.avatar;
+          if (instructorData.avatar instanceof File) {
+            const avatarPath = `avatars/${Date.now()}_${instructorData.avatar.name}`;
+            avatarUrl = await uploadFileToStorage(instructorData.avatar, avatarPath);
+          }
+
+          const instructorUpdateData = {
+            name: instructorData.name,
+            title: instructorData.title,
+            bio: instructorData.bio,
+            avatar: avatarUrl
+          };
+
+          const { error: instructorError } = await supabase
+            .from('instructors')
+            .update(instructorUpdateData)
+            .eq('course_id', courseId);
+
+          if (instructorError) throw instructorError;
+
+          // 4. Update modules and lessons
+          // First, get existing modules to know which to update/delete
+          const { data: existingModules } = await supabase
+            .from('modules')
+            .select('id, lessons(id)')
+            .eq('course_id', courseId);
+
+          // Delete existing modules that are not in the new modules list
+          const newModuleIds = modules.filter(m => m.id).map(m => m.id);
+          const modulesToDelete = existingModules?.filter(m => !newModuleIds.includes(m.id)) || [];
+          
+          for (const moduleToDelete of modulesToDelete) {
+            // Delete lessons first
+            await supabase.from('lessons').delete().eq('module_id', moduleToDelete.id);
+            // Delete module
+            await supabase.from('modules').delete().eq('id', moduleToDelete.id);
+          }
+
+          // Process modules
+          const moduleIdMapping = {};
+          
+          for (let moduleIndex = 0; moduleIndex < modules.length; moduleIndex++) {
+            const module = modules[moduleIndex];
+            let moduleId;
+
+            if (module.id) {
+              // Update existing module
+              moduleId = module.id;
+              const { error: moduleError } = await supabase
+                .from('modules')
+                .update({
+                  title: module.title,
+                  duration: module.duration
+                })
+                .eq('id', moduleId);
+
+              if (moduleError) throw moduleError;
+
+              // Delete existing lessons for this module
+              await supabase.from('lessons').delete().eq('module_id', moduleId);
+            } else {
+              // Create new module
+              const { data: moduleData, error: moduleError } = await supabase
+                .from('modules')
+                .insert({
+                  title: module.title,
+                  duration: module.duration,
+                  course_id: courseId
+                })
+                .select()
+                .single();
+
+              if (moduleError) throw moduleError;
+              moduleId = moduleData.id;
+            }
+
+            moduleIdMapping[module.title] = moduleId;
+
+            // Insert lessons for this module
+            for (const lesson of module.lessons) {
+              let lessonVideoUrl = lesson.videoUrl;
+
+              // Upload lesson video if it's a file
+              if (lesson.videoFile instanceof File) {
+                const videoPath = `videos/${Date.now()}_${lesson.videoFile.name}`;
+                lessonVideoUrl = await uploadFileToStorage(lesson.videoFile, videoPath);
+              }
+
+              const lessonData = {
+                title: lesson.title,
+                duration: lesson.duration,
+                type: lesson.type,
+                preview: lesson.preview,
+                videoUrl: lessonVideoUrl,
+                resources: lesson.resources,
+                module_id: moduleId
+              };
+
+              const { error: lessonError } = await supabase
+                .from('lessons')
+                .insert(lessonData);
+
+              if (lessonError) throw lessonError;
+            }
+          }
+
+          // 5. Update quizzes
+          // Delete existing quizzes and questions
+          const { data: existingQuizzes } = await supabase
+            .from('quizzes')
+            .select('id')
+            .eq('course_id', courseId);
+
+          for (const quiz of existingQuizzes || []) {
+            await supabase.from('questions').delete().eq('quiz_id', quiz.id);
+            await supabase.from('quizzes').delete().eq('id', quiz.id);
+          }
+
+          // Insert new quizzes
+          for (const quiz of quizzes) {
+            const actualModuleId = moduleIdMapping[quiz.moduleId];
+            
+            const { data: quizData, error: quizError } = await supabase
+              .from('quizzes')
+              .insert({
+                title: quiz.title,
+                description: quiz.description,
+                timeLimit: quiz.timeLimit,
+                passingScore: quiz.passingScore,
+                moduleId: actualModuleId,
+                course_id: courseId
+              })
+              .select()
+              .single();
+
+            if (quizError) throw quizError;
+
+            // Insert questions
+            for (const question of quiz.questions) {
+              const { error: questionError } = await supabase
+                .from('questions')
+                .insert({
+                  quiz_id: quizData.id,
+                  question: question.question,
+                  type: question.type,
+                  options: question.options.filter(option => option.trim() !== ''),
+                  correctAnswer: question.correctAnswer,
+                  correctAnswers: question.correctAnswers || [],
+                  explanation: question.explanation
+                });
+
+              if (questionError) throw questionError;
+            }
+          }
+
+          // 6. Update assignments  
+          // Delete existing assignments
+          await supabase.from('assignments').delete().eq('course_id', courseId);
+
+          // Insert new assignments
+          for (const assignment of assignments) {
+            const actualModuleId = moduleIdMapping[assignment.moduleId];
+            
+            const { error: assignmentError } = await supabase
+              .from('assignments')
+              .insert({
+                title: assignment.title,
+                description: assignment.description,
+                estimatedTime: assignment.estimatedTime,
+                submissionFormat: assignment.submissionFormat,
+                moduleId: actualModuleId,
+                instructions: assignment.instructions,
+                deliverables: assignment.deliverables,
+                resources: assignment.resources,
+                tips: assignment.tips,
+                rubric: assignment.rubric || {},
+                course_id: courseId
+              });
+
+            if (assignmentError) throw assignmentError;
+          }
+
+          // Complete the updateCompleteCourse function (add this to the end of your existing function)
+          // Refresh data to get updated course
+          await get().refreshData();
+
+          set({ loading: false });
+          
+          return { 
+            success: true, 
+            message: 'Course updated successfully!' 
+          };
+
+        } catch (error) {
+          console.error('Error updating course:', error);
+          set({ 
+            loading: false, 
+            error: error.message 
+          });
+          
+          return { 
+            success: false, 
+            error: error.message 
+          };
+        }
+      },
+
       // Delete course
       deleteCourse: async (id) => {
-        set({ loading: true });
-        
         try {
-          const { error } = await supabase
-            .from('courses')
-            .delete()
-            .eq('id', id);
+          set({ loading: true, error: null });
 
+          // Delete in proper order to maintain referential integrity
+          
+          // 1. Delete questions first
+          const { data: quizzes } = await supabase
+            .from('quizzes')
+            .select('id')
+            .eq('course_id', id);
+
+          for (const quiz of quizzes || []) {
+            await supabase.from('questions').delete().eq('quiz_id', quiz.id);
+          }
+
+          // 2. Delete quizzes
+          await supabase.from('quizzes').delete().eq('course_id', id);
+
+          // 3. Delete assignments
+          await supabase.from('assignments').delete().eq('course_id', id);
+
+          // 4. Delete lessons
+          const { data: modules } = await supabase
+            .from('modules')
+            .select('id')
+            .eq('course_id', id);
+
+          for (const module of modules || []) {
+            await supabase.from('lessons').delete().eq('module_id', module.id);
+          }
+
+          // 5. Delete modules
+          await supabase.from('modules').delete().eq('course_id', id);
+
+          // 6. Delete instructor
+          await supabase.from('instructors').delete().eq('course_id', id);
+
+          // 7. Finally delete course
+          const { error } = await supabase.from('courses').delete().eq('id', id);
           if (error) throw error;
 
           // Update local state
@@ -511,28 +943,283 @@ const useAdminCourseStore = create(
             loading: false
           }));
 
-          return { success: true };
+          return { success: true, message: 'Course deleted successfully' };
+
         } catch (error) {
-          set({ error: error.message, loading: false });
+          set({ loading: false, error: error.message });
+          return { success: false, error: error.message };
+        }
+      },
+
+      // Duplicate course
+      duplicateCourse: async (id) => {
+        try {
+          set({ loading: true, error: null });
+
+          const originalCourse = get().getCourseById(id);
+          if (!originalCourse) {
+            throw new Error('Course not found');
+          }
+
+          // Get complete course data
+          const courseData = await get().getCourseForEdit(id);
+          if (!courseData.success) {
+            throw courseData.error;
+          }
+
+          const { 
+            courseData: course, 
+            instructorData: instructor, 
+            modules, 
+            quizzes, 
+            assignments 
+          } = courseData.data;
+
+          // Create new course with modified title
+          const newCourseData = {
+            ...course,
+            title: `${course.title} (Copy)`,
+            slug: `${course.slug}-copy-${Date.now()}`,
+            featured: false,
+            bestseller: false
+          };
+
+          // Use the existing add course flow but with complete data
+          const result = await get().addCompleteCourse(
+            newCourseData,
+            instructor,
+            modules,
+            quizzes,
+            assignments
+          );
+
+          set({ loading: false });
+          return result;
+
+        } catch (error) {
+          set({ loading: false, error: error.message });
+          return { success: false, error: error.message };
+        }
+      },
+
+      // Add complete course (for create and duplicate)
+      addCompleteCourse: async (courseData, instructorData, modules, quizzes, assignments) => {
+        try {
+          set({ loading: true, error: null });
+
+          // Helper function to upload file
+          const uploadFileToStorage = async (file, path) => {
+            const { data, error } = await supabase.storage.from('course-content').upload(path, file, {
+              cacheControl: '3600',
+              upsert: true
+            });
+            if (error) throw error;
+            const { data: urlData } = supabase.storage.from('course-content').getPublicUrl(path);
+            return urlData.publicUrl;
+          };
+
+          // 1. Handle course image upload
+          let imageUrl = courseData.image;
+          if (courseData.image instanceof File) {
+            const imagePath = `images/${Date.now()}_${courseData.image.name}`;
+            imageUrl = await uploadFileToStorage(courseData.image, imagePath);
+          }
+
+          // 2. Create course
+          const { data: course, error: courseError } = await supabase
+            .from('courses')
+            .insert({
+              title: courseData.title,
+              slug: courseData.slug,
+              description: courseData.description,
+              shortDescription: courseData.shortDescription,
+              image: imageUrl,
+              categoryId: courseData.categoryId,
+              subcategory: courseData.subcategory,
+              level: courseData.level,
+              language: courseData.language,
+              price: courseData.price ? courseData.price : null,
+              original_price: courseData.originalPrice,
+              requirements: courseData.requirements,
+              whatYouWillLearn: courseData.whatYouWillLearn,
+              targetAudience: courseData.targetAudience,
+              featured: courseData.featured,
+              bestseller: courseData.bestseller,
+              status: 'draft'
+            })
+            .select()
+            .single();
+
+          if (courseError) throw courseError;
+
+          const courseId = course.id;
+
+          // 3. Handle instructor avatar and create instructor
+          let avatarUrl = instructorData.avatar;
+          if (instructorData.avatar instanceof File) {
+            const avatarPath = `avatars/${Date.now()}_${instructorData.avatar.name}`;
+            avatarUrl = await uploadFileToStorage(instructorData.avatar, avatarPath);
+          }
+
+          const { error: instructorError } = await supabase
+            .from('instructors')
+            .insert({
+              name: instructorData.name,
+              title: instructorData.title,
+              bio: instructorData.bio,
+              avatar: avatarUrl,
+              course_id: courseId
+            });
+
+          if (instructorError) throw instructorError;
+
+          // 4. Create modules and lessons
+          const moduleIdMapping = {};
+
+          for (const module of modules) {
+            const { data: moduleData, error: moduleError } = await supabase
+              .from('modules')
+              .insert({
+                title: module.title,
+                duration: module.duration,
+                course_id: courseId
+              })
+              .select()
+              .single();
+
+            if (moduleError) throw moduleError;
+
+            moduleIdMapping[module.title] = moduleData.id;
+
+            // Create lessons for this module
+            for (const lesson of module.lessons) {
+              let lessonVideoUrl = lesson.videoUrl;
+
+              if (lesson.videoFile instanceof File) {
+                const videoPath = `videos/${Date.now()}_${lesson.videoFile.name}`;
+                lessonVideoUrl = await uploadFileToStorage(lesson.videoFile, videoPath);
+              }
+
+              const { error: lessonError } = await supabase
+                .from('lessons')
+                .insert({
+                  title: lesson.title,
+                  duration: lesson.duration,
+                  type: lesson.type,
+                  preview: lesson.preview,
+                  videoUrl: lessonVideoUrl,
+                  resources: lesson.resources,
+                  module_id: moduleData.id
+                });
+
+              if (lessonError) throw lessonError;
+            }
+          }
+
+          // 5. Create quizzes and questions
+          for (const quiz of quizzes) {
+            const actualModuleId = moduleIdMapping[quiz.moduleId];
+
+            const { data: quizData, error: quizError } = await supabase
+              .from('quizzes')
+              .insert({
+                title: quiz.title,
+                description: quiz.description,
+                timeLimit: quiz.timeLimit,
+                passingScore: quiz.passingScore,
+                moduleId: actualModuleId,
+                course_id: courseId
+              })
+              .select()
+              .single();
+
+            if (quizError) throw quizError;
+
+            // Create questions
+            for (const question of quiz.questions) {
+              const { error: questionError } = await supabase
+                .from('questions')
+                .insert({
+                  quiz_id: quizData.id,
+                  question: question.question,
+                  type: question.type,
+                  options: question.options,
+                  correctAnswer: question.correctAnswer,
+                  correctAnswers: question.correctAnswers || [],
+                  explanation: question.explanation
+                });
+
+              if (questionError) throw questionError;
+            }
+          }
+
+          // 6. Create assignments
+          for (const assignment of assignments) {
+            const actualModuleId = moduleIdMapping[assignment.moduleId];
+
+            const { error: assignmentError } = await supabase
+              .from('assignments')
+              .insert({
+                title: assignment.title,
+                description: assignment.description,
+                estimatedTime: assignment.estimatedTime,
+                submissionFormat: assignment.submissionFormat,
+                moduleId: actualModuleId,
+                instructions: assignment.instructions,
+                deliverables: assignment.deliverables,
+                resources: assignment.resources,
+                tips: assignment.tips,
+                rubric: assignment.rubric || {},
+                course_id: courseId
+              });
+
+            if (assignmentError) throw assignmentError;
+          }
+
+          // Refresh data
+          await get().refreshData();
+
+          set({ loading: false });
+
+          return {
+            success: true,
+            message: 'Course created successfully!',
+            courseId: courseId
+          };
+
+        } catch (error) {
+          console.error('Error creating course:', error);
+          set({ loading: false, error: error.message });
           return { success: false, error: error.message };
         }
       },
 
       // Clear error
-      clearError: () => set({ error: null })
+      clearError: () => set({ error: null }),
+
+      // Helper function to get module options for dropdowns
+      getModuleOptions: () => {
+        const { courses } = get();
+        const allModules = courses.flatMap(course => 
+          course.modules?.map(module => ({
+            value: module.title,
+            label: `${course.title} - ${module.title}`,
+            courseId: course.id,
+            moduleId: module.id
+          })) || []
+        );
+        return allModules;
+      }
     }),
     {
       name: 'admin-course-store',
       partialize: (state) => ({
-        // Only persist UI state, not data
-        filters: state.filters,
-        sortBy: state.sortBy,
-        sortOrder: state.sortOrder,
-        itemsPerPage: state.itemsPerPage,
+        courses: state.courses,
+        instructors: state.instructors,
+        categories: state.categories,
         lastFetch: state.lastFetch
       })
     }
   )
 );
-
 export default useAdminCourseStore;

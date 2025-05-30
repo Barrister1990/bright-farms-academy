@@ -195,6 +195,7 @@ const useCourseStore = create((set, get) => ({
             id,
             title,
             duration,
+            position,
             lessons (
               id,
               title,
@@ -207,6 +208,7 @@ const useCourseStore = create((set, get) => ({
           )
         `)
         .eq('id', courseId)
+        .order('position', { foreignTable: 'modules', ascending: true })
         .single();
 
       if (courseError) throw courseError;
@@ -306,7 +308,7 @@ const useCourseStore = create((set, get) => ({
         rating: Math.round(rating * 10) / 10,
         reviewsCount: reviews?.length || 0,
         studentsCount: studentsCount || 0,
-        duration: `${totalDuration} hours`,
+        duration: totalDuration,
         price: course.price ? parseFloat(course.price) : 0,
         originalPrice: course.originalPrice ? parseFloat(course.originalPrice) : null,
         discount: course.originalPrice && course.price 
@@ -435,7 +437,7 @@ const useCourseStore = create((set, get) => ({
       if (error) throw error;
 
       const enrolledCourseIds = enrollments?.map(e => e.course_id) || [];
-      console.log(enrolledCourseIds);
+   
       
       set({ enrolledCourses: enrolledCourseIds, loading: false });
       return enrollments;
