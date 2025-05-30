@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
-import { Sprout } from 'lucide-react';
-import { useEffect } from 'react';
+import { Monitor, Sprout, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import useUserStore from '../store/userStore';
@@ -172,10 +172,88 @@ const LoadingScreen = () => {
   );
 };
 
-// Protected Route Component with enhanced admin access control
+// Mobile Admin Warning Component
+const MobileAdminWarning = ({ onDismiss }) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -50 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -50 }}
+      className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg"
+    >
+      <div className="container mx-auto px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <Monitor className="h-5 w-5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium">
+                Admin Panel on Mobile
+              </p>
+              <p className="text-xs opacity-90">
+                For the best experience, we recommend using a larger screen
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onDismiss}
+            className="p-1 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
+            aria-label="Dismiss warning"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+// Hook to detect mobile devices
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkIsMobile = () => {
+      // Check screen width
+      const screenWidth = window.innerWidth <= 768;
+      
+      // Check user agent for mobile devices
+      const userAgent = navigator.userAgent.toLowerCase();
+      const mobileKeywords = ['mobile', 'android', 'iphone', 'ipad', 'tablet'];
+      const isMobileDevice = mobileKeywords.some(keyword => userAgent.includes(keyword));
+      
+      // Consider it mobile if either condition is true
+      setIsMobile(screenWidth || isMobileDevice);
+    };
+
+    // Check on mount
+    checkIsMobile();
+
+    // Listen for resize events
+    window.addEventListener('resize', checkIsMobile);
+
+    return () => {
+      window.removeEventListener('resize', checkIsMobile);
+    };
+  }, []);
+
+  return isMobile;
+};
+
+// Protected Route Component with enhanced admin access control and mobile warning
 const ProtectedRoute = ({ children, requiredRole = null }) => {
   const { isLoggedIn, isInitialized, user } = useUserStore();
   const location = useLocation();
+  const isMobile = useIsMobile();
+  const [showMobileWarning, setShowMobileWarning] = useState(false);
+
+  // Check if user is accessing admin routes on mobile
+  useEffect(() => {
+    if (location.pathname.startsWith('/admin') && isMobile && user?.role === 'admin') {
+      setShowMobileWarning(true);
+    } else {
+      setShowMobileWarning(false);
+    }
+  }, [location.pathname, isMobile, user?.role]);
 
   // Show beautiful loading while initializing
   if (!isInitialized) {
@@ -203,12 +281,30 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
       const allowedRoutes = ['/dashboard', '/admin']; // Both roles can access these
       
       if (allowedRoutes.includes(location.pathname) && ['admin', 'student'].includes(user?.role)) {
-        return children;
+        return (
+          <>
+            {showMobileWarning && (
+              <MobileAdminWarning onDismiss={() => setShowMobileWarning(false)} />
+            )}
+            <div className={showMobileWarning ? 'pt-16' : ''}>
+              {children}
+            </div>
+          </>
+        );
       }
       
       // For /admin route specifically, allow both admin and student
       if (location.pathname === '/admin' && ['admin', 'student'].includes(user?.role)) {
-        return children;
+        return (
+          <>
+            {showMobileWarning && (
+              <MobileAdminWarning onDismiss={() => setShowMobileWarning(false)} />
+            )}
+            <div className={showMobileWarning ? 'pt-16' : ''}>
+              {children}
+            </div>
+          </>
+        );
       }
       
       // Otherwise redirect to dashboard
@@ -216,7 +312,16 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
     }
   }
 
-  return children;
+  return (
+    <>
+      {showMobileWarning && (
+        <MobileAdminWarning onDismiss={() => setShowMobileWarning(false)} />
+      )}
+      <div className={showMobileWarning ? 'pt-16' : ''}>
+        {children}
+      </div>
+    </>
+  );
 };
 
 // Export everything at the bottom for better Fast Refresh compatibility
