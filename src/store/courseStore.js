@@ -363,6 +363,7 @@ const useCourseStore = create((set, get) => ({
               quizData: null,
               assignmentData: {
                 id: moduleAssignment.id,
+                type: moduleAssignment.type,
                 title: moduleAssignment.title,
                 description: moduleAssignment.description,
                 instructions: Array.isArray(moduleAssignment.instructions) 

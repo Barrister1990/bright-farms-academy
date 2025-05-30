@@ -1163,7 +1163,7 @@ function formatDuration(totalMinutes) {
                         }
                         
                         return (
-                          <div className="max-w-3xl mx-auto">
+                          <div className="max-w-3xl mx-auto overflow-y-auto">
                             <h4 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 mb-3 sm:mb-4 md:mb-6 leading-relaxed">
                               {question.question}
                             </h4>
@@ -1214,10 +1214,7 @@ function formatDuration(totalMinutes) {
                         );
                       })()}
                     </div>
-                  </div>
-                  
-                  {/* Navigation */}
-                  <div className="border-t bg-gray-50 p-2 sm:p-3 md:p-4 flex-shrink-0">
+                      <div className="border bg-gray-50 p-2 sm:p-3 md:p-4 flex-shrink-0">
                     <div className="flex justify-between items-center max-w-3xl mx-auto w-full">
                       <button
                         onClick={previousQuestion}
@@ -1246,11 +1243,15 @@ function formatDuration(totalMinutes) {
                       </div>
                     </div>
                   </div>
+                  </div>
+                  
+                  {/* Navigation */}
+                
                 </div>
               ) : (
                 // Quiz Results Screen
                 <div className="flex-1 overflow-y-auto">
-                  <div className="min-h-full flex items-center justify-center p-3 sm:p-4 md:p-6 lg:p-8">
+                  <div className=" flex items-center justify-center p-3 sm:p-4 md:p-6 lg:p-8">
                     <div className="text-center max-w-2xl w-full">
                       <div className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl mb-3 sm:mb-4 lg:mb-6">
                         {quizState.score >= (currentLesson.quizData?.passingScore || 70) ? '🎉' : '😞'}
